@@ -26,13 +26,14 @@ from torch.utils.data import Dataset, DataLoader
 
 class BlenderSyntheticDataset(Dataset):
 
-    def __init__(self, root_path, max_num_examples=None, examples_per_file=200):
+    def __init__(self, dataset_path, max_num_examples=None, examples_per_file=200):
 
         super(BlenderSyntheticDataset, self).__init__()
 
         # List all data files and obtain number of examples
-        self.root_path = root_path
-        self.data_files = cortex.utils.find_files(root_path, "h5")
+        self.dataset_path = dataset_path
+        self.data_files   = cortex.utils.find_files(dataset_path, "h5")
+        self.labels = set()
         self.num_examples = self._scan_dataset_length()
 
         if max_num_examples:
@@ -42,11 +43,16 @@ class BlenderSyntheticDataset(Dataset):
         num_examples = 0
         for i, data_file in enumerate(self.data_files):
             hf = h5py.File(data_file, 'r')
-            num_examples += len(hf['labels'])
+            labels = hf['labels']
+            self.labels = self.labels.union(set(labels))
+            num_examples += len(labels)
             if i == 0:
                 self.examples_per_file = num_examples
             hf.close()
         return num_examples
+
+    def num_classes(self):
+        return len(self.labels)
 
     def __len__(self):
         return self.num_examples
@@ -64,10 +70,12 @@ class BlenderSyntheticDataset(Dataset):
 
 if __name__ == "__main__":
 
-    root_path = "/home/tomrunia/data/VideoCountingDataset/BlenderSyntheticRandom/videos_as_dataset"
-    dataset = BlenderSyntheticDataset(root_path)
-
     import cv2
+    root_path = "/home/tomrunia/data/VideoCountingDataset/BlenderSyntheticRandom/videos_as_dataset"
+
+    dataset = BlenderSyntheticDataset(root_path)
+    print(dataset.labels, dataset.num_classes())
+
     for i in range(10):
         frames, label = dataset.__getitem__(np.random.randint(0, len(dataset)))
         for frame in frames:

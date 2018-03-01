@@ -25,6 +25,7 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 
+from blender_dataset import BlenderSyntheticDataset
 
 def train_epoch():
     pass
@@ -35,45 +36,52 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train 3D ConvNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Positional arguments
-    parser.add_argument('data_path', type=str, help='Root for the Cifar dataset.')
-    parser.add_argument('dataset', type=str, choices=['cifar10', 'cifar100'], help='Choose between Cifar10/100.')
-
-    # Optimization options
-    parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
-    parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
-    parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, help='The Learning Rate.')
-    parser.add_argument('--momentum', '-m', type=float, default=0.9, help='Momentum.')
-    parser.add_argument('--decay', '-d', type=float, default=0.0005, help='Weight decay (L2 penalty).')
-
-    # Checkpoints
-    parser.add_argument('--save', '-s', type=str, default='./', help='Folder to save checkpoints.')
-    parser.add_argument('--load', '-l', type=str, help='Checkpoint path to resume / test.')
-    parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
-
-    # Architecture
-    parser.add_argument('--depth', type=int, default=29, help='Model depth.')
-    parser.add_argument('--cardinality', type=int, default=8, help='Model cardinality (group).')
-    parser.add_argument('--base_width', type=int, default=64, help='Number of channels in each group.')
-
-    # Acceleration
-    parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
-    parser.add_argument('--prefetch', type=int, default=2, help='Pre-fetching threads.')
-
-    # i/o
-    parser.add_argument('--log', type=str, default='./', help='Log folder.')
-    args = parser.parse_args()
+    # parser.add_argument('data_path', type=str, help='Root for the Cifar dataset.')
+    # parser.add_argument('dataset', type=str, choices=['cifar10', 'cifar100'], help='Choose between Cifar10/100.')
+    #
+    # # Optimization options
+    # parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
+    # parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
+    # parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, help='The Learning Rate.')
+    # parser.add_argument('--momentum', '-m', type=float, default=0.9, help='Momentum.')
+    # parser.add_argument('--decay', '-d', type=float, default=0.0005, help='Weight decay (L2 penalty).')
+    #
+    # # Checkpoints
+    # parser.add_argument('--save', '-s', type=str, default='./', help='Folder to save checkpoints.')
+    # parser.add_argument('--load', '-l', type=str, help='Checkpoint path to resume / test.')
+    # parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
+    #
+    # # Architecture
+    # parser.add_argument('--depth', type=int, default=29, help='Model depth.')
+    # parser.add_argument('--cardinality', type=int, default=8, help='Model cardinality (group).')
+    # parser.add_argument('--base_width', type=int, default=64, help='Number of channels in each group.')
+    #
+    # # Acceleration
+    # parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
+    # parser.add_argument('--prefetch', type=int, default=2, help='Pre-fetching threads.')
+    #
+    # # i/o
+    # parser.add_argument('--log', type=str, default='./', help='Log folder.')
+    # args = parser.parse_args()
 
     ############################################################################
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
 
     # Init logger
-    if not os.path.isdir(args.log):
-        os.makedirs(args.log)
-    log = open(os.path.join(args.log, 'log.txt'), 'w')
-    state = {k: v for k, v in args._get_kwargs()}
-    log.write(json.dumps(state) + '\n')
+    # if not os.path.isdir(args.log):
+    #     os.makedirs(args.log)
+    # log = open(os.path.join(args.log, 'log.txt'), 'w')
+    # state = {k: v for k, v in args._get_kwargs()}
+    # log.write(json.dumps(state) + '\n')
 
-    # ...
+    root_path = "/home/tomrunia/data/VideoCountingDataset/BlenderSyntheticRandom/videos_as_dataset"
+    train_data = BlenderSyntheticDataset(root_path)
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=32, shuffle=True,
+                                               num_workers=10, pin_memory=True)
 
-    optimizer = torch.optim.RMSprop(net.parameters(), state['learning_rate'])
+    for i, (frames, label) in enumerate(train_loader):
+
+        print(i, frames.shape)
+
+    #optimizer = torch.optim.RMSprop(net.parameters(), state['learning_rate'])
 
