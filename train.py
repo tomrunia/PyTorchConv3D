@@ -18,17 +18,62 @@ from __future__ import print_function
 
 import os
 import json
+import time
+from datetime import datetime
 import argparse
 
+import numpy as np
 import torch
-import torch.nn.functional as F
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
 
-from blender_dataset import BlenderSyntheticDataset
+from torch import nn
+from torch import optim
+from torch.autograd import Variable
 
-def train_epoch():
-    pass
+from models.conv3d_repetition import Conv3D_Repetition
+from transform.spatial import *
+from dataset import BlenderSyntheticDataset
+from utils import AverageMeter, calculate_accuracy
+
+
+def train_epoch(epoch, net, data_loader, optimizer):
+
+    examples_per_second = AverageMeter()
+    losses = AverageMeter()
+    accuracies = AverageMeter()
+
+    end_time = time.time()
+    for step, (clips, labels) in enumerate(data_loader):
+
+        clips  = Variable(clips)
+        labels = Variable(labels)
+        if args.ngpu > 0:
+            clips  = clips.cuda()
+            labels = labels.cuda()
+
+        # Forward pass through the network
+        logits = net(clips)
+
+        loss = criterion(logits, labels)
+        acc = calculate_accuracy(logits, labels)
+
+        losses.update(loss.data[0], clips.size(0))
+        accuracies.update(acc, clips.size(0))
+
+        # Perform optimization step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Only for time measurement of step through network
+        batch_examples_per_second = args.batch_size / float(time.time() - end_time)
+        examples_per_second.update(batch_examples_per_second)
+
+        print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.2f}, Loss = {:.3f}".format(
+            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch, step, len(data_loader),
+            args.batch_size, examples_per_second.avg, accuracies.avg, losses.avg
+        ))
+
+        end_time = time.time()
 
 
 if __name__ == "__main__":
@@ -36,13 +81,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train 3D ConvNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Positional arguments
-    # parser.add_argument('data_path', type=str, help='Root for the Cifar dataset.')
-    # parser.add_argument('dataset', type=str, choices=['cifar10', 'cifar100'], help='Choose between Cifar10/100.')
-    #
+    parser.add_argument('--data_path', type=str, help='Root path for dataset.')
+
     # # Optimization options
-    # parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
-    # parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
-    # parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, help='The Learning Rate.')
+    parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
+    parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.001, help='The Learning Rate.')
     # parser.add_argument('--momentum', '-m', type=float, default=0.9, help='Momentum.')
     # parser.add_argument('--decay', '-d', type=float, default=0.0005, help='Weight decay (L2 penalty).')
     #
@@ -57,31 +101,33 @@ if __name__ == "__main__":
     # parser.add_argument('--base_width', type=int, default=64, help='Number of channels in each group.')
     #
     # # Acceleration
-    # parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
-    # parser.add_argument('--prefetch', type=int, default=2, help='Pre-fetching threads.')
+    parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
+    parser.add_argument('--workers', type=int, default=4, help='Pre-fetching threads.')
     #
     # # i/o
     # parser.add_argument('--log', type=str, default='./', help='Log folder.')
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
     ############################################################################
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
 
-    # Init logger
-    # if not os.path.isdir(args.log):
-    #     os.makedirs(args.log)
-    # log = open(os.path.join(args.log, 'log.txt'), 'w')
-    # state = {k: v for k, v in args._get_kwargs()}
-    # log.write(json.dumps(state) + '\n')
+    # Define the input pipeline
+    spatial_transform = Compose([ToTensor(225), Normalize([0, 0, 0], [1, 1, 1])])
+    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, spatial_transform=spatial_transform)
 
-    root_path = "/home/tomrunia/data/VideoCountingDataset/BlenderSyntheticRandom/videos_as_dataset"
-    train_data = BlenderSyntheticDataset(root_path)
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=32, shuffle=True,
-                                               num_workers=10, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True)
 
-    for i, (frames, label) in enumerate(train_loader):
+    # Define the network
+    net = Conv3D_Repetition(num_classes=train_data.num_classes())
+    if args.ngpu > 0: net.cuda()
 
-        print(i, frames.shape)
+    # Loss criterion and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.RMSprop(net.parameters(), lr=args.learning_rate)
 
-    #optimizer = torch.optim.RMSprop(net.parameters(), state['learning_rate'])
+    for epoch in range(args.epochs):
+        train_epoch(epoch, net, train_loader, optimizer)
+
 

@@ -21,12 +21,13 @@ import numpy as np
 import cortex.utils
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+import torch.utils.data as data
 
 
-class BlenderSyntheticDataset(Dataset):
+class BlenderSyntheticDataset(data.Dataset):
 
-    def __init__(self, dataset_path, max_num_examples=None, examples_per_file=200):
+    def __init__(self, dataset_path, max_num_examples=None,
+                 temporal_transform=None, spatial_transform=None):
 
         super(BlenderSyntheticDataset, self).__init__()
 
@@ -34,7 +35,12 @@ class BlenderSyntheticDataset(Dataset):
         self.dataset_path = dataset_path
         self.data_files   = cortex.utils.find_files(dataset_path, "h5")
         self.labels = set()
+
         self.num_examples = self._scan_dataset_length()
+        self.labels = np.asarray(list(self.labels), dtype=int)
+
+        self.temporal_transform = temporal_transform
+        self.spatial_transform  = spatial_transform
 
         if max_num_examples:
             self.num_examples = min(self.num_examples, max_num_examples)
@@ -63,23 +69,18 @@ class BlenderSyntheticDataset(Dataset):
         # Compute the index inside the container
         video_idx = idx-(file_idx*self.examples_per_file)
         with h5py.File(self.data_files[file_idx]) as hf:
-            frames = hf['videos'][video_idx]
-            label  = hf['labels'][video_idx]
-        return frames, label
+            clip  = hf['videos'][video_idx]
+            label = hf['labels'][video_idx]
 
+        # Execute temporal transformations (shuffling, repeating etc...)
+        # ...
 
-if __name__ == "__main__":
+        # Execute spatial transformations
+        if self.spatial_transform is not None:
+            self.spatial_transform.randomize_parameters()
+            clip = [self.spatial_transform(img) for img in clip]
+        clip = torch.stack(clip, 0).permute(1,0,2,3)
 
-    import cv2
-    root_path = "/home/tomrunia/data/VideoCountingDataset/BlenderSyntheticRandom/videos_as_dataset"
-
-    dataset = BlenderSyntheticDataset(root_path)
-    print(dataset.labels, dataset.num_classes())
-
-    for i in range(10):
-        frames, label = dataset.__getitem__(np.random.randint(0, len(dataset)))
-        for frame in frames:
-            cv2.imshow("frame", frame)
-            cv2.waitKey(30)
-
-
+        # Convert to class index
+        label = int(np.argwhere(self.labels == label))
+        return clip, label
