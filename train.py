@@ -265,7 +265,7 @@ if __name__ == "__main__":
         is_best = epoch_val_acc > best_val_acc
 
         if is_best:
-            print("[{}] Found new best model, saving it ...")
+            print("[{}] Found new best model, saving it ...".format(datetime.now().strftime("%A %H:%M")))
 
         # Save the model after each epoch
         if checkpoint_path is not None and epoch % args.checkpoint_interval == 0:
@@ -278,7 +278,7 @@ if __name__ == "__main__":
                 'optimizer':  optimizer.state_dict()
             }
             save_checkpoint(states, is_best, save_file_path)
-            print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M"), save_file_path))
+            print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%A %H:%M"), save_file_path))
 
         # Keep track of the best validation performance
         if epoch_val_acc > best_val_acc:
