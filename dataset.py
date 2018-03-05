@@ -33,7 +33,7 @@ class BlenderSyntheticDataset(data.Dataset):
 
         # List all data files and obtain number of examples
         self.dataset_path = dataset_path
-        self.data_files   = cortex.utils.find_files(dataset_path, "h5")
+        self.data_files = cortex.utils.find_files(dataset_path, "h5")
         self.labels = set()
 
         self.num_examples = self._scan_dataset_length()
