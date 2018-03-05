@@ -17,17 +17,20 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import shutil
 import json
 import time
 from datetime import datetime
 import argparse
 
 import numpy as np
-import torch
 
+import torch
 from torch import nn
 from torch import optim
 from torch.autograd import Variable
+import torchvision.utils
+import torchvision.transforms
 
 from models.conv3d_repetition import Conv3D_Repetition
 from transform.spatial import *
@@ -44,7 +47,8 @@ accuracies = AverageMeter(history=10)
 
 
 def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
-                summary_interval=1, checkpoint_path=None, checkpoint_interval=1):
+                scalar_summary_interval=1, image_summary_interval=100,
+                checkpoint_path=None, checkpoint_interval=1):
 
     batches_per_epoch = len(data_loader)
     end_time = time.time()
@@ -79,14 +83,19 @@ def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
         examples_per_second.push(batch_examples_per_second)
 
         print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.2f}, Loss = {:.3f}".format(
-            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch, step_in_batch, len(data_loader),
+            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch+1, step_in_batch, len(data_loader),
             args.batch_size, examples_per_second.average(), accuracies.average(), losses.average()
         ))
 
         # Save to TensorBoard
-        if step % summary_interval == 0:
+        if step % scalar_summary_interval == 0:
             summary_writer.add_scalar('train/loss', loss.data[0], step)
             summary_writer.add_scalar('train/accuracy', acc, step)
+
+        if step % image_summary_interval == 0:
+            image_sequence = clips[0].permute(1,0,2,3)
+            image_grid = torchvision.utils.make_grid(image_sequence.data, nrow=8)
+            summary_writer.add_image('train/images', image_grid)
 
         end_time = time.time()
 
@@ -111,6 +120,7 @@ if __name__ == "__main__":
     # Positional arguments
     parser.add_argument('--data_path', type=str, help='Root path for dataset.')
     parser.add_argument('--out_path', type=str, default='./output/', help='Root path for dataset.')
+    parser.add_argument('--overwrite_output_path', type=bool, default=True, help='Whether to overwrite output dir if exists.')
 
     # Optimization options
     parser.add_argument('--epochs', '-e', type=int, default=10, help='Number of epochs to train.')
@@ -125,10 +135,10 @@ if __name__ == "__main__":
     # Acceleration
     parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
     parser.add_argument('--workers', type=int, default=4, help='Pre-fetching threads.')
-    #
-    # i/o
-    # parser.add_argument('--log', type=str, default='./', help='Log folder.')
-    parser.add_argument('--summary_interval', type=int, default=10, help='Summary saving frequency (steps).')
+
+    # Logging
+    parser.add_argument('--scalar_summary_interval', type=int, default=10, help='Scalar summary saving frequency (steps).')
+    parser.add_argument('--image_summary_interval', type=int, default=10, help='Image summary saving frequency (steps).')
     parser.add_argument('--checkpoint_interval', type=int, default=1, help='Checkpoint saving frequency (epochs).')
 
 
@@ -137,6 +147,10 @@ if __name__ == "__main__":
     ############################################################################
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
 
+    if os.path.exists(args.out_path) and args.overwrite_output_path:
+        shutil.rmtree(args.out_path)
+        os.makedirs(args.out_path)
+
     checkpoint_path = os.path.join(args.out_path, 'checkpoints')
     summary_path    = os.path.join(args.out_path, 'summaries')
 
@@ -144,8 +158,17 @@ if __name__ == "__main__":
     summary_writer = SummaryWriter(summary_path)
 
     # Define the input pipeline
-    spatial_transform = Compose([ToTensor(225), Normalize([0, 0, 0], [1, 1, 1])])
-    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, max_num_examples=100, spatial_transform=spatial_transform)
+    # Define the input pipeline
+    spatial_transform = Compose([
+        torchvision.transforms.ToPILImage(),
+        RandomHorizontalFlip(),
+        torchvision.transforms.RandomRotation(degrees=5, resample=2),
+        torchvision.transforms.ColorJitter(0.3, 0.3, 0.3),
+        ToTensor(225),
+        Normalize([0, 0, 0], [1, 1, 1])
+    ])
+
+    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, spatial_transform=spatial_transform)
 
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True,
@@ -163,7 +186,9 @@ if __name__ == "__main__":
 
         # Perform optimization for one epoch
         train_epoch(epoch=epoch, net=net, data_loader=train_loader, optimizer=optimizer,
-                    summary_writer=summary_writer, summary_interval=args.summary_interval,
+                    summary_writer=summary_writer,
+                    scalar_summary_interval=args.scalar_summary_interval,
+                    image_summary_interval=args.image_summary_interval,
                     checkpoint_path=checkpoint_path, checkpoint_interval=args.checkpoint_interval)
 
     summary_writer.export_scalars_to_json(os.path.join(args.out_path, 'train_summary.json'))

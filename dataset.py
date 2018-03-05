@@ -78,9 +78,12 @@ class BlenderSyntheticDataset(data.Dataset):
         # Execute spatial transformations
         if self.spatial_transform is not None:
             self.spatial_transform.randomize_parameters()
-            clip = [self.spatial_transform(img) for img in clip]
-        clip = torch.stack(clip, 0).permute(1,0,2,3)
+            clip_preproc = []
+            for frame in clip:
+                frame = np.expand_dims(frame, -1)
+                clip_preproc.append(self.spatial_transform(frame))
+        clip_preproc = torch.stack(clip_preproc, 0).permute(1,0,2,3)
 
         # Convert to class index
         label = int(np.argwhere(self.labels == label))
-        return clip, label
+        return clip_preproc, label

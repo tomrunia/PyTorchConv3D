@@ -50,8 +50,9 @@ class Compose(object):
 
     def randomize_parameters(self):
         for t in self.transforms:
-            t.randomize_parameters()
-
+            randomize_op = getattr(t, "randomize_parameters", None)
+            if callable(randomize_op):
+                randomize_op()
 
 class ToTensor(object):
     """Convert a ``PIL.Image`` or ``numpy.ndarray`` to tensor.
