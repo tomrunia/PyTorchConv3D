@@ -17,16 +17,12 @@ from __future__ import division
 from __future__ import print_function
 
 import h5py
-import numpy as np
 import cortex.utils
-
-import torch
 
 import torch.utils.data
 import torchvision.transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from video_transform.spatial import *
-
 
 
 class BlenderSyntheticDataset(torch.utils.data.Dataset):
