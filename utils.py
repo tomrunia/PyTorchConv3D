@@ -16,8 +16,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import numpy as np
+import torch
+import shutil
 
 ################################################################################
 
@@ -58,3 +59,8 @@ def calculate_accuracy(outputs, targets):
     correct = pred.eq(targets.view(1, -1))
     n_correct_elems = correct.float().sum().data[0]
     return n_correct_elems / batch_size
+
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model_best.pth.tar')

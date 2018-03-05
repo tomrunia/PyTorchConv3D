@@ -34,22 +34,23 @@ import torchvision.utils
 import torchvision.transforms
 
 from models.conv3d_repetition import Conv3D_Repetition
-from transform.spatial import *
 from dataset import BlenderSyntheticDataset
-from utils import AverageMeter, calculate_accuracy
+from transform.spatial import *
+from utils import *
 
 from tensorboardX import SummaryWriter
 
 ################################################################################
+
+
 
 examples_per_second = AverageMeter(history=10)
 losses = AverageMeter(history=10)
 accuracies = AverageMeter(history=10)
 
 
-def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
-                scalar_summary_interval=1, image_summary_interval=100,
-                checkpoint_path=None, checkpoint_interval=1):
+def train(epoch, net, data_loader, optimizer, summary_writer=None,
+          scalar_summary_interval=1, image_summary_interval=100):
 
     # This has any effect only on modules such as Dropout or BatchNorm.
     net.train()
@@ -62,6 +63,8 @@ def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
         # Compute the global step
         step = (epoch*batches_per_epoch) + step_in_batch
 
+        # Check the use of volatile=True and async=True
+        # See here: https://github.com/pytorch/examples/blob/master/imagenet/main.py
         clips  = Variable(clips)
         labels = Variable(labels)
         if args.ngpu > 0:
@@ -95,6 +98,7 @@ def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
         if step % scalar_summary_interval == 0:
             summary_writer.add_scalar('train/loss', loss.data[0], step)
             summary_writer.add_scalar('train/accuracy', acc, step)
+            summary_writer.add_scaler('train/examples_per_second', batch_examples_per_second, step)
 
         if step % image_summary_interval == 0:
             image_sequence = clips[0].permute(1,0,2,3)
@@ -103,18 +107,6 @@ def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
 
         end_time = time.time()
 
-    # Save the model after each epoch
-    if checkpoint_path is not None and epoch % checkpoint_interval == 0:
-        if not os.path.exists(checkpoint_path):
-            os.makedirs(checkpoint_path)
-        save_file_path = os.path.join(checkpoint_path, "save_{:06d}.pth".format(epoch+1))
-        states = {
-            'epoch':      epoch+1,
-            'state_dict': net.state_dict(),
-            'optimizer':  optimizer.state_dict()
-        }
-        torch.save(states, save_file_path)
-        print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M"), save_file_path))
 
 ################################################################################
 
@@ -144,6 +136,7 @@ if __name__ == "__main__":
 
     ############################################################################
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
+    # Another one:  https://github.com/pytorch/examples/blob/master/imagenet/main.py
 
     run_output_path = os.path.join(args.output_path, datetime.now().strftime("%Y%m%d_%H:%M"))
     os.makedirs(run_output_path)
@@ -153,6 +146,8 @@ if __name__ == "__main__":
 
     # Initialize TensorBoard summary writer
     summary_writer = SummaryWriter(summary_path)
+
+    ############################################################################
 
     # Define the input pipeline
     spatial_transform = Compose([
@@ -164,29 +159,63 @@ if __name__ == "__main__":
         Normalize([0, 0, 0], [1, 1, 1])
     ])
 
+    # TODO: checkout best way train/validation data loading
     train_data = BlenderSyntheticDataset(dataset_path=args.data_path, spatial_transform=spatial_transform)
-
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True)
 
+    ############################################################################
+
     # Define the network
+    # TODO: check how to use weight decay ...
     net = Conv3D_Repetition(num_classes=train_data.num_classes())
     if args.ngpu > 0: net.cuda()
 
     # Loss criterion and optimizer
+    # TODO: check how to setup learning rate decay...
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.RMSprop(net.parameters(), lr=args.learning_rate)
+
+    ############################################################################
+    # Main train/evaluation loop
+
+    best_val_loss = np.inf
+    best_val_acc  = 0.0
 
     for epoch in range(args.epochs):
 
         # Perform optimization for one epoch
-        train_epoch(epoch=epoch, net=net, data_loader=train_loader, optimizer=optimizer,
-                    summary_writer=summary_writer,
-                    scalar_summary_interval=args.scalar_summary_interval,
-                    image_summary_interval=args.image_summary_interval,
-                    checkpoint_path=checkpoint_path, checkpoint_interval=args.checkpoint_interval)
+        train(epoch=epoch, net=net, data_loader=train_loader,
+              optimizer=optimizer, summary_writer=summary_writer,
+              scalar_summary_interval=args.scalar_summary_interval,
+              image_summary_interval=args.image_summary_interval)
 
+        # Perform validation for entire dataset
+        # validation_error = ...
+        epoch_val_loss = np.random.rand()
+        epoch_val_acc  = np.random.rand()
+        is_best = epoch_val_acc > best_val_acc
+
+        # Save the model after each epoch
+        if checkpoint_path is not None and epoch % args.checkpoint_interval == 0:
+            if not os.path.exists(checkpoint_path):
+                os.makedirs(checkpoint_path)
+            save_file_path = os.path.join(checkpoint_path, "save_{:06d}.pth.tar".format(epoch+1))
+            states = {
+                'epoch':      epoch+1,
+                'state_dict': net.state_dict(),
+                'optimizer':  optimizer.state_dict()
+            }
+            save_checkpoint(states, is_best, save_file_path)
+            print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M"), save_file_path))
+
+        # Keep track of the best validation performance
+        if epoch_val_acc > best_val_acc:
+            best_val_acc  = epoch_val_acc
+            best_val_loss = epoch_val_loss
+
+    # Save JSON file of scalars to disk
     summary_writer.export_scalars_to_json(os.path.join(args.out_path, 'train_summary.json'))
     summary_writer.close()
 
