@@ -16,9 +16,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import shutil
 import numpy as np
 import torch
-import shutil
+
 
 ################################################################################
 
@@ -63,5 +65,6 @@ def calculate_accuracy(outputs, targets):
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        directory = os.path.dirname(filename)
+        shutil.copyfile(filename, os.path.join(directory, 'checkpoint_best.pth.tar'))
 

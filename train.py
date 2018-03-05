@@ -270,7 +270,7 @@ if __name__ == "__main__":
         if checkpoint_path is not None and epoch % args.checkpoint_interval == 0:
             if not os.path.exists(checkpoint_path):
                 os.makedirs(checkpoint_path)
-            save_file_path = os.path.join(checkpoint_path, "save_{:06d}.pth.tar".format(epoch+1))
+            save_file_path = os.path.join(checkpoint_path, "checkpoint_{:06d}.pth.tar".format(epoch+1))
             states = {
                 'epoch':      epoch+1,
                 'state_dict': net.state_dict(),
