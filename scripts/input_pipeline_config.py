@@ -32,7 +32,7 @@ from torch import optim
 from torch.autograd import Variable
 import torchvision.transforms
 
-from models.conv3d_repetition import Conv3D_Repetition
+from models.conv3d import Conv3D_Repetition
 from video_transform.spatial import *
 from dataset import BlenderSyntheticDataset
 from utils import AverageMeter, calculate_accuracy

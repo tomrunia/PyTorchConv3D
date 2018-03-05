@@ -16,7 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+
 import time
 from datetime import datetime
 import argparse
@@ -30,7 +30,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.autograd import Variable
 import torchvision.utils
 
-from models.conv3d_repetition import Conv3D_Repetition
+from models.conv3d import Conv3D_Repetition
 from dataset import init_datasets
 from utils import *
 
@@ -103,7 +103,6 @@ def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler
             summary_writer.add_scalar('train/accuracy', acc, step)
             summary_writer.add_scalar('train/examples_per_second', batch_examples_per_second, step)
             summary_writer.add_scalar('train/learning_rate', curr_learning_rate, epoch_first_step)
-
 
         if step % image_summary_interval == 0:
             image_sequence = inputs[0].permute(1,0,2,3)
