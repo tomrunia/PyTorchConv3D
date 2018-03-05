@@ -185,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate.')
     parser.add_argument('--learning_rate_decay_factor', type=float, default=0.1, help='Learning rate decay factor.')
     parser.add_argument('--learning_rate_decay_epochs', type=int, default=20, help='After how many epochs to decay learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay on trainable parameters.')
+    parser.add_argument('--weight_decay', type=float, default=7e-4, help='Weight decay on trainable parameters.')
     parser.add_argument('--drop_rate', type=float, default=0.5, help='Dropout rate for last fully-connected layer.')
 
     # Acceleration
