@@ -17,27 +17,39 @@ from __future__ import division
 from __future__ import print_function
 
 
-import csv
+import numpy as np
 
+################################################################################
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
-    def __init__(self):
-        self.reset()
+    def __init__(self, history=10):
+        self.history = history
+        self.values = np.zeros(self.history, dtype=np.float32)
+        self.num_recorded = 0
+
+    def push(self, value):
+        assert np.isscalar(value)
+        if self.num_recorded == 0:
+            self.values.fill(value)
+        else:
+            self.values[:-1] = self.values[1:]
+            self.values[-1] = value
+        #print(self.values)
+        self.num_recorded += 1
+
+    def last(self):
+        return self.values[-1]
+
+    def average(self):
+        return np.mean(self.values)
 
     def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
+        self.values = np.zeros(self.history, dtype=np.float32)
+        self.num_recorded = 0
 
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
+################################################################################
 
 def calculate_accuracy(outputs, targets):
     batch_size = targets.size(0)

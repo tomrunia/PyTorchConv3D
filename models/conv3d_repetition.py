@@ -24,9 +24,11 @@ from torch.autograd import Variable
 
 class Conv3D_Repetition(nn.Module):
 
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, is_training=True):
 
         super(Conv3D_Repetition, self).__init__()
+
+        self.is_training = is_training
         self.num_classes = num_classes
 
         ########################################################################

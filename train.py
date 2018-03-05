@@ -34,15 +34,25 @@ from transform.spatial import *
 from dataset import BlenderSyntheticDataset
 from utils import AverageMeter, calculate_accuracy
 
+from tensorboardX import SummaryWriter
 
-def train_epoch(epoch, net, data_loader, optimizer):
+################################################################################
 
-    examples_per_second = AverageMeter()
-    losses = AverageMeter()
-    accuracies = AverageMeter()
+examples_per_second = AverageMeter(history=10)
+losses = AverageMeter(history=10)
+accuracies = AverageMeter(history=10)
 
+
+def train_epoch(epoch, net, data_loader, optimizer, summary_writer=None,
+                summary_interval=1, checkpoint_path=None, checkpoint_interval=1):
+
+    batches_per_epoch = len(data_loader)
     end_time = time.time()
-    for step, (clips, labels) in enumerate(data_loader):
+
+    for step_in_batch, (clips, labels) in enumerate(data_loader):
+
+        # Compute the global step
+        step = (epoch*batches_per_epoch) + step_in_batch
 
         clips  = Variable(clips)
         labels = Variable(labels)
@@ -56,8 +66,8 @@ def train_epoch(epoch, net, data_loader, optimizer):
         loss = criterion(logits, labels)
         acc = calculate_accuracy(logits, labels)
 
-        losses.update(loss.data[0], clips.size(0))
-        accuracies.update(acc, clips.size(0))
+        losses.push(loss.data[0])
+        accuracies.push(acc)
 
         # Perform optimization step
         optimizer.zero_grad()
@@ -66,14 +76,32 @@ def train_epoch(epoch, net, data_loader, optimizer):
 
         # Only for time measurement of step through network
         batch_examples_per_second = args.batch_size / float(time.time() - end_time)
-        examples_per_second.update(batch_examples_per_second)
+        examples_per_second.push(batch_examples_per_second)
 
         print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.2f}, Loss = {:.3f}".format(
-            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch, step, len(data_loader),
-            args.batch_size, examples_per_second.avg, accuracies.avg, losses.avg
+            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch, step_in_batch, len(data_loader),
+            args.batch_size, examples_per_second.average(), accuracies.average(), losses.average()
         ))
 
+        # Save to TensorBoard
+        if step % summary_interval == 0:
+            summary_writer.add_scalar('train/loss', loss.data[0], step)
+            summary_writer.add_scalar('train/accuracy', acc, step)
+
         end_time = time.time()
+
+    # Save the model after each epoch
+    if checkpoint_path is not None and epoch % checkpoint_interval == 0:
+        if not os.path.exists(checkpoint_path):
+            os.makedirs(checkpoint_path)
+        save_file_path = os.path.join(checkpoint_path, "save_{:06d}.pth".format(epoch+1))
+        states = {
+            'epoch':      epoch+1,
+            'state_dict': net.state_dict(),
+            'optimizer':  optimizer.state_dict()
+        }
+        torch.save(states, save_file_path)
+        print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M"), save_file_path))
 
 
 if __name__ == "__main__":
@@ -82,38 +110,42 @@ if __name__ == "__main__":
 
     # Positional arguments
     parser.add_argument('--data_path', type=str, help='Root path for dataset.')
+    parser.add_argument('--out_path', type=str, default='./output/', help='Root path for dataset.')
 
-    # # Optimization options
-    parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
+    # Optimization options
+    parser.add_argument('--epochs', '-e', type=int, default=10, help='Number of epochs to train.')
     parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.001, help='The Learning Rate.')
-    # parser.add_argument('--momentum', '-m', type=float, default=0.9, help='Momentum.')
-    # parser.add_argument('--decay', '-d', type=float, default=0.0005, help='Weight decay (L2 penalty).')
-    #
-    # # Checkpoints
-    # parser.add_argument('--save', '-s', type=str, default='./', help='Folder to save checkpoints.')
-    # parser.add_argument('--load', '-l', type=str, help='Checkpoint path to resume / test.')
-    # parser.add_argument('--test', '-t', action='store_true', help='Test only flag.')
-    #
-    # # Architecture
+
+    # Architecture
     # parser.add_argument('--depth', type=int, default=29, help='Model depth.')
     # parser.add_argument('--cardinality', type=int, default=8, help='Model cardinality (group).')
     # parser.add_argument('--base_width', type=int, default=64, help='Number of channels in each group.')
     #
-    # # Acceleration
+    # Acceleration
     parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
     parser.add_argument('--workers', type=int, default=4, help='Pre-fetching threads.')
     #
-    # # i/o
+    # i/o
     # parser.add_argument('--log', type=str, default='./', help='Log folder.')
+    parser.add_argument('--summary_interval', type=int, default=10, help='Summary saving frequency (steps).')
+    parser.add_argument('--checkpoint_interval', type=int, default=1, help='Checkpoint saving frequency (epochs).')
+
+
     args = parser.parse_args()
 
     ############################################################################
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
 
+    checkpoint_path = os.path.join(args.out_path, 'checkpoints')
+    summary_path    = os.path.join(args.out_path, 'summaries')
+
+    # Initialize TensorBoard summary writer
+    summary_writer = SummaryWriter(summary_path)
+
     # Define the input pipeline
     spatial_transform = Compose([ToTensor(225), Normalize([0, 0, 0], [1, 1, 1])])
-    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, spatial_transform=spatial_transform)
+    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, max_num_examples=100, spatial_transform=spatial_transform)
 
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size, shuffle=True,
@@ -128,6 +160,13 @@ if __name__ == "__main__":
     optimizer = optim.RMSprop(net.parameters(), lr=args.learning_rate)
 
     for epoch in range(args.epochs):
-        train_epoch(epoch, net, train_loader, optimizer)
+
+        # Perform optimization for one epoch
+        train_epoch(epoch=epoch, net=net, data_loader=train_loader, optimizer=optimizer,
+                    summary_writer=summary_writer, summary_interval=args.summary_interval,
+                    checkpoint_path=checkpoint_path, checkpoint_interval=args.checkpoint_interval)
+
+    summary_writer.export_scalars_to_json(os.path.join(args.out_path, 'train_summary.json'))
+    summary_writer.close()
 
 
