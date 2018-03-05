@@ -92,7 +92,7 @@ def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler
 
         print("[{}] Epoch {}, Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, "
               "LR = {:.4f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
-            datetime.now().strftime("%Y-%m-%d %H:%M"), epoch+1, step_in_batch, len(data_loader),
+            datetime.now().strftime("%A %H:%M"), epoch+1, step_in_batch, len(data_loader),
             args.batch_size, examples_per_second.average(), curr_learning_rate,
             accuracies.average(), losses.average()
         ))
@@ -146,7 +146,7 @@ def validate(net, criterion, data_loader):
 
         print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, "
               "Accuracy = {:.3f}, Loss = {:.3f}".format(
-            datetime.now().strftime("%Y-%m-%d %H:%M"), valid_step, num_batches,
+            datetime.now().strftime("%A %H:%M"), valid_step, num_batches,
             examples_per_second.average(), loss, acc
         ))
 
