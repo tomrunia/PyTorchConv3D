@@ -24,10 +24,12 @@ from torch.autograd import Variable
 
 class Conv3D_Repetition(nn.Module):
 
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, drop_rate=0.5):
 
         super(Conv3D_Repetition, self).__init__()
+
         self.num_classes = num_classes
+        self.drop_rate = drop_rate
 
         ########################################################################
 
@@ -81,6 +83,8 @@ class Conv3D_Repetition(nn.Module):
         x = self.fc4(x)
         x = self.relu(x)
         x = self.bn4(x)
+
+        x = F.dropout(x, p=self.drop_rate, training=self.training, inplace=True)
 
         return self.output(x)
 

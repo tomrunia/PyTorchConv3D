@@ -48,7 +48,6 @@ accuracies = AverageMeter(history=history)
 def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler=None,
           summary_writer=None, scalar_summary_interval=1, image_summary_interval=100):
 
-    # This has any effect only on modules such as Dropout or BatchNorm.
     net.train()
 
     # Update learning rate decay
@@ -113,7 +112,6 @@ def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler
 
 def validate(net, criterion, data_loader):
 
-    # This has any effect only on modules such as Dropout or BatchNorm.
     net.eval()
 
     num_batches = len(data_loader)
@@ -188,6 +186,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate_decay_factor', type=float, default=0.1, help='Learning rate decay factor.')
     parser.add_argument('--learning_rate_decay_epochs', type=int, default=20, help='After how many epochs to decay learning rate.')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay on trainable parameters.')
+    parser.add_argument('--drop_rate', type=float, default=0.5, help='Dropout rate for last fully-connected layer.')
 
     # Acceleration
     parser.add_argument('--num_gpu', type=int, default=1, help='Number of GPUs. Set to 0 to perform on CPU.')
@@ -282,7 +281,6 @@ if __name__ == "__main__":
         if epoch_val_acc > best_val_acc:
             best_val_acc  = epoch_val_acc
             best_val_loss = epoch_val_loss
-
 
     # Save JSON file of scalars to disk
     summary_writer.export_scalars_to_json(os.path.join(args.output_path, 'train_summary.json'))
