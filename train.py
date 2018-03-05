@@ -147,7 +147,7 @@ def validate(net, criterion, data_loader):
         print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, "
               "Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%Y-%m-%d %H:%M"), valid_step, num_batches,
-            examples_per_second.average(), accuracies.average(), losses.average()
+            examples_per_second.average(), loss, acc
         ))
 
         # Save one validation example from the first batch
