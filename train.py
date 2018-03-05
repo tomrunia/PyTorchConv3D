@@ -28,14 +28,12 @@ import numpy as np
 import torch
 from torch import nn
 from torch import optim
+from torch.optim.lr_scheduler import StepLR
 from torch.autograd import Variable
-import torch.utils.data
 import torchvision.utils
-import torchvision.transforms
 
 from models.conv3d_repetition import Conv3D_Repetition
-from dataset import BlenderSyntheticDataset
-from transform.spatial import *
+from dataset import init_datasets
 from utils import *
 
 from tensorboardX import SummaryWriter
@@ -49,7 +47,7 @@ losses = AverageMeter(history=10)
 accuracies = AverageMeter(history=10)
 
 
-def train(epoch, net, data_loader, optimizer, summary_writer=None,
+def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
           scalar_summary_interval=1, image_summary_interval=100):
 
     # This has any effect only on modules such as Dropout or BatchNorm.
@@ -58,21 +56,21 @@ def train(epoch, net, data_loader, optimizer, summary_writer=None,
     batches_per_epoch = len(data_loader)
     end_time = time.time()
 
-    for step_in_batch, (clips, labels) in enumerate(data_loader):
+    for step_in_batch, (inputs, labels) in enumerate(data_loader):
 
         # Compute the global step
         step = (epoch*batches_per_epoch) + step_in_batch
 
         # Check the use of volatile=True and async=True
         # See here: https://github.com/pytorch/examples/blob/master/imagenet/main.py
-        clips  = Variable(clips)
+        inputs = Variable(inputs)
         labels = Variable(labels)
         if args.ngpu > 0:
-            clips  = clips.cuda()
+            inputs = inputs.cuda()
             labels = labels.cuda()
 
         # Forward pass through the network
-        logits = net(clips)
+        logits = net(inputs)
 
         loss = criterion(logits, labels)
         acc = calculate_accuracy(logits, labels)
@@ -89,7 +87,7 @@ def train(epoch, net, data_loader, optimizer, summary_writer=None,
         batch_examples_per_second = args.batch_size / float(time.time() - end_time)
         examples_per_second.push(batch_examples_per_second)
 
-        print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.2f}, Loss = {:.3f}".format(
+        print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%Y-%m-%d %H:%M"), epoch+1, step_in_batch, len(data_loader),
             args.batch_size, examples_per_second.average(), accuracies.average(), losses.average()
         ))
@@ -98,15 +96,72 @@ def train(epoch, net, data_loader, optimizer, summary_writer=None,
         if step % scalar_summary_interval == 0:
             summary_writer.add_scalar('train/loss', loss.data[0], step)
             summary_writer.add_scalar('train/accuracy', acc, step)
-            summary_writer.add_scaler('train/examples_per_second', batch_examples_per_second, step)
+            summary_writer.add_scalar('train/examples_per_second', batch_examples_per_second, step)
+
 
         if step % image_summary_interval == 0:
-            image_sequence = clips[0].permute(1,0,2,3)
+            image_sequence = inputs[0].permute(1,0,2,3)
             image_grid = torchvision.utils.make_grid(image_sequence.data, nrow=8)
             summary_writer.add_image('train/images', image_grid)
 
         end_time = time.time()
 
+def validate(epoch, net, criterion, data_loader):
+
+    # This has any effect only on modules such as Dropout or BatchNorm.
+    net.eval()
+
+    num_batches = len(data_loader)
+    epoch_losses = []
+    epoch_accuracies = []
+
+    end_time = time.time()
+    print("#"*60)
+
+    for valid_step, (inputs, labels) in enumerate(data_loader):
+
+        inputs = Variable(inputs)
+        labels = Variable(labels)
+        if args.ngpu > 0:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
+
+        # Forward pass through the network
+        logits = net(inputs)
+
+        # Calculate and save metrics
+        loss = criterion(logits, labels)
+        acc = calculate_accuracy(logits, labels)
+        epoch_losses.append(loss.data[0])
+        epoch_accuracies.append(acc)
+
+        # Only for time measurement of step through network
+        batch_examples_per_second = args.batch_size / float(time.time() - end_time)
+        examples_per_second.push(batch_examples_per_second)
+
+        print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+            datetime.now().strftime("%Y-%m-%d %H:%M"), valid_step, num_batches,
+            examples_per_second.average(), accuracies.average(), losses.average()
+        ))
+
+        # Save one validation example from the first batch
+        if valid_step == 0:
+            example_idx = np.random.randint(len(inputs))
+            image_sequence = inputs[example_idx].permute(1,0,2,3)
+            image_grid = torchvision.utils.make_grid(image_sequence.data, nrow=8)
+            summary_writer.add_image('valid/images', image_grid)
+
+        end_time = time.time()
+
+    val_loss = np.mean(epoch_losses)
+    val_acc  = np.mean(epoch_accuracies)
+
+    print("VALIDATION SUMMARY ({} batches):".format(len(data_loader)))
+    print("  Loss:     {:.3f}".format(val_loss))
+    print("  Accuracy: {:.3f}".format(val_acc))
+    print("#"*60)
+
+    return val_loss, val_acc
 
 ################################################################################
 
@@ -115,17 +170,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train 3D ConvNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Positional arguments
-    parser.add_argument('--data_path', type=str, help='Root path for dataset.')
+    parser.add_argument('--data_path', type=str, required=True, help='Root path for dataset.')
     parser.add_argument('--output_path', type=str, default='./output/', help='Root path for dataset.')
 
     # Optimization options
-    parser.add_argument('--epochs', '-e', type=int, default=10, help='Number of epochs to train.')
-    parser.add_argument('--batch_size', '-b', type=int, default=32, help='Batch size.')
-    parser.add_argument('--learning_rate', '-lr', type=float, default=0.001, help='The Learning Rate.')
+    parser.add_argument('--epochs', type=int, default=30, help='Number of epochs to train.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
+    parser.add_argument('--valid_frac', type=float, default=0.1, help='Fraction of dataset to use for validation.')
+
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.001, help='Initial learning rate.')
+    parser.add_argument('--learning_rate_decay_factor', type=float, default=0.1, help='Learning rate decay factor.')
+    parser.add_argument('--learning_rate_decay_epochs', type=int, default=20, help='After how many epochs to decay learning rate.')
+    parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay on trainable parameters.')
 
     # Acceleration
     parser.add_argument('--ngpu', type=int, default=1, help='Number of GPUs. Set to 0 to perform on CPU.')
-    parser.add_argument('--workers', type=int, default=6, help='Pre-fetching threads.')
+    parser.add_argument('--workers', type=int, default=8, help='Pre-fetching threads.')
 
     # Logging
     parser.add_argument('--scalar_summary_interval', type=int, default=10, help='Scalar summary saving frequency (steps).')
@@ -138,7 +198,7 @@ if __name__ == "__main__":
     # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
     # Another one:  https://github.com/pytorch/examples/blob/master/imagenet/main.py
 
-    run_output_path = os.path.join(args.output_path, datetime.now().strftime("%Y%m%d_%H:%M"))
+    run_output_path = os.path.join(args.output_path, datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(run_output_path)
 
     checkpoint_path = os.path.join(run_output_path, 'checkpoints')
@@ -149,33 +209,29 @@ if __name__ == "__main__":
 
     ############################################################################
 
-    # Define the input pipeline
-    spatial_transform = Compose([
-        torchvision.transforms.ToPILImage(),
-        RandomHorizontalFlip(),
-        torchvision.transforms.RandomRotation(degrees=5, resample=2),
-        torchvision.transforms.ColorJitter(0.3, 0.3, 0.3),
-        ToTensor(225),
-        Normalize([0, 0, 0], [1, 1, 1])
-    ])
-
-    # TODO: checkout best way train/validation data loading
-    train_data = BlenderSyntheticDataset(dataset_path=args.data_path, spatial_transform=spatial_transform)
-    train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+    train_loader, valid_loader, classes = init_datasets(
+        data_path=args.data_path, batch_size=args.batch_size,
+        valid_frac=args.valid_frac, num_workers=args.workers,
+        shuffle_initial=False)
 
     ############################################################################
 
     # Define the network
-    # TODO: check how to use weight decay ...
-    net = Conv3D_Repetition(num_classes=train_data.num_classes())
+    net = Conv3D_Repetition(num_classes=len(classes))
     if args.ngpu > 0: net.cuda()
 
     # Loss criterion and optimizer
-    # TODO: check how to setup learning rate decay...
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.RMSprop(net.parameters(), lr=args.learning_rate)
+
+    optimizer = optim.RMSprop(
+        params=net.parameters(),
+        lr=args.learning_rate,
+        weight_decay=args.weight_decay)
+
+    # Setup learning rate decay
+    learning_rate_scheduler = StepLR(optimizer=optimizer,
+                                     step_size=args.learning_rate_decay_factor,
+                                     gamma=args.learning_rate_decay_factor)
 
     ############################################################################
     # Main train/evaluation loop
@@ -185,16 +241,28 @@ if __name__ == "__main__":
 
     for epoch in range(args.epochs):
 
+        epoch_first_step = epoch*len(train_loader)
+
+        # Perform learning rate decay
+        learning_rate_scheduler.step(epoch)
+        curr_learning_rate = learning_rate_scheduler.get_lr()[0]
+        summary_writer.add_scalar('train/learning_rate', curr_learning_rate, epoch_first_step)
+
         # Perform optimization for one epoch
-        train(epoch=epoch, net=net, data_loader=train_loader,
-              optimizer=optimizer, summary_writer=summary_writer,
+        train(epoch=epoch, net=net, criterion=criterion,
+              data_loader=train_loader, optimizer=optimizer,
+              summary_writer=summary_writer,
               scalar_summary_interval=args.scalar_summary_interval,
               image_summary_interval=args.image_summary_interval)
 
-        # Perform validation for entire dataset
-        # validation_error = ...
-        epoch_val_loss = np.random.rand()
-        epoch_val_acc  = np.random.rand()
+        # Perform evaluation over entire validation set
+        epoch_val_loss, epoch_val_acc = validate(epoch=epoch, net=net,
+                                                 criterion=criterion,
+                                                 data_loader=valid_loader)
+
+        # Save validation performance as summaries
+        summary_writer.add_scalar('validation/loss', epoch_val_loss, epoch_first_step)
+        summary_writer.add_scalar('validation/accuracy', epoch_val_acc, epoch_first_step)
         is_best = epoch_val_acc > best_val_acc
 
         # Save the model after each epoch
@@ -215,8 +283,9 @@ if __name__ == "__main__":
             best_val_acc  = epoch_val_acc
             best_val_loss = epoch_val_loss
 
+
     # Save JSON file of scalars to disk
-    summary_writer.export_scalars_to_json(os.path.join(args.out_path, 'train_summary.json'))
+    summary_writer.export_scalars_to_json(os.path.join(args.output_path, 'train_summary.json'))
     summary_writer.close()
 
 
