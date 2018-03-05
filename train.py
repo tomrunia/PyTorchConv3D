@@ -17,8 +17,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import shutil
-import json
 import time
 from datetime import datetime
 import argparse
@@ -40,18 +38,21 @@ from tensorboardX import SummaryWriter
 
 ################################################################################
 
+history = 25
+
+examples_per_second = AverageMeter(history=history)
+losses = AverageMeter(history=history)
+accuracies = AverageMeter(history=history)
 
 
-examples_per_second = AverageMeter(history=10)
-losses = AverageMeter(history=10)
-accuracies = AverageMeter(history=10)
-
-
-def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
-          scalar_summary_interval=1, image_summary_interval=100):
+def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler=None,
+          summary_writer=None, scalar_summary_interval=1, image_summary_interval=100):
 
     # This has any effect only on modules such as Dropout or BatchNorm.
     net.train()
+
+    # Update learning rate decay
+    learning_rate_scheduler.step(epoch)
 
     batches_per_epoch = len(data_loader)
     end_time = time.time()
@@ -65,7 +66,7 @@ def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
         # See here: https://github.com/pytorch/examples/blob/master/imagenet/main.py
         inputs = Variable(inputs)
         labels = Variable(labels)
-        if args.ngpu > 0:
+        if args.num_gpu > 0:
             inputs = inputs.cuda()
             labels = labels.cuda()
 
@@ -87,9 +88,13 @@ def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
         batch_examples_per_second = args.batch_size / float(time.time() - end_time)
         examples_per_second.push(batch_examples_per_second)
 
-        print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+        curr_learning_rate = learning_rate_scheduler.get_lr()[0]
+
+        print("[{}] Epoch {}, Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, "
+              "LR = {:.4f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%Y-%m-%d %H:%M"), epoch+1, step_in_batch, len(data_loader),
-            args.batch_size, examples_per_second.average(), accuracies.average(), losses.average()
+            args.batch_size, examples_per_second.average(), curr_learning_rate,
+            accuracies.average(), losses.average()
         ))
 
         # Save to TensorBoard
@@ -97,6 +102,7 @@ def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
             summary_writer.add_scalar('train/loss', loss.data[0], step)
             summary_writer.add_scalar('train/accuracy', acc, step)
             summary_writer.add_scalar('train/examples_per_second', batch_examples_per_second, step)
+            summary_writer.add_scalar('train/learning_rate', curr_learning_rate, epoch_first_step)
 
 
         if step % image_summary_interval == 0:
@@ -106,7 +112,7 @@ def train(epoch, net, criterion, data_loader, optimizer, summary_writer=None,
 
         end_time = time.time()
 
-def validate(epoch, net, criterion, data_loader):
+def validate(net, criterion, data_loader):
 
     # This has any effect only on modules such as Dropout or BatchNorm.
     net.eval()
@@ -122,7 +128,7 @@ def validate(epoch, net, criterion, data_loader):
 
         inputs = Variable(inputs)
         labels = Variable(labels)
-        if args.ngpu > 0:
+        if args.num_gpu > 0:
             inputs = inputs.cuda()
             labels = labels.cuda()
 
@@ -139,7 +145,8 @@ def validate(epoch, net, criterion, data_loader):
         batch_examples_per_second = args.batch_size / float(time.time() - end_time)
         examples_per_second.push(batch_examples_per_second)
 
-        print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+        print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, "
+              "Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%Y-%m-%d %H:%M"), valid_step, num_batches,
             examples_per_second.average(), accuracies.average(), losses.average()
         ))
@@ -153,8 +160,8 @@ def validate(epoch, net, criterion, data_loader):
 
         end_time = time.time()
 
-    val_loss = np.mean(epoch_losses)
-    val_acc  = np.mean(epoch_accuracies)
+    val_loss = float(np.mean(epoch_losses))
+    val_acc  = float(np.mean(epoch_accuracies))
 
     print("VALIDATION SUMMARY ({} batches):".format(len(data_loader)))
     print("  Loss:     {:.3f}".format(val_loss))
@@ -178,13 +185,13 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
     parser.add_argument('--valid_frac', type=float, default=0.1, help='Fraction of dataset to use for validation.')
 
-    parser.add_argument('--learning_rate', '-lr', type=float, default=0.001, help='Initial learning rate.')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate.')
     parser.add_argument('--learning_rate_decay_factor', type=float, default=0.1, help='Learning rate decay factor.')
     parser.add_argument('--learning_rate_decay_epochs', type=int, default=20, help='After how many epochs to decay learning rate.')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay on trainable parameters.')
 
     # Acceleration
-    parser.add_argument('--ngpu', type=int, default=1, help='Number of GPUs. Set to 0 to perform on CPU.')
+    parser.add_argument('--num_gpu', type=int, default=1, help='Number of GPUs. Set to 0 to perform on CPU.')
     parser.add_argument('--workers', type=int, default=8, help='Pre-fetching threads.')
 
     # Logging
@@ -195,8 +202,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ############################################################################
-    # Nice example: https://github.com/prlz77/ResNeXt.pytorch/blob/master/train.py
-    # Another one:  https://github.com/pytorch/examples/blob/master/imagenet/main.py
 
     run_output_path = os.path.join(args.output_path, datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(run_output_path)
@@ -218,7 +223,7 @@ if __name__ == "__main__":
 
     # Define the network
     net = Conv3D_Repetition(num_classes=len(classes))
-    if args.ngpu > 0: net.cuda()
+    if args.num_gpu > 0: net.cuda()
 
     # Loss criterion and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -230,7 +235,7 @@ if __name__ == "__main__":
 
     # Setup learning rate decay
     learning_rate_scheduler = StepLR(optimizer=optimizer,
-                                     step_size=args.learning_rate_decay_factor,
+                                     step_size=args.learning_rate_decay_epochs,
                                      gamma=args.learning_rate_decay_factor)
 
     ############################################################################
@@ -243,20 +248,16 @@ if __name__ == "__main__":
 
         epoch_first_step = epoch*len(train_loader)
 
-        # Perform learning rate decay
-        learning_rate_scheduler.step(epoch)
-        curr_learning_rate = learning_rate_scheduler.get_lr()[0]
-        summary_writer.add_scalar('train/learning_rate', curr_learning_rate, epoch_first_step)
-
         # Perform optimization for one epoch
         train(epoch=epoch, net=net, criterion=criterion,
               data_loader=train_loader, optimizer=optimizer,
+              learning_rate_scheduler=learning_rate_scheduler,
               summary_writer=summary_writer,
               scalar_summary_interval=args.scalar_summary_interval,
               image_summary_interval=args.image_summary_interval)
 
         # Perform evaluation over entire validation set
-        epoch_val_loss, epoch_val_acc = validate(epoch=epoch, net=net,
+        epoch_val_loss, epoch_val_acc = validate(net=net,
                                                  criterion=criterion,
                                                  data_loader=valid_loader)
 
