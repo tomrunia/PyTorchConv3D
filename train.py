@@ -145,7 +145,7 @@ def validate(net, criterion, data_loader):
         print("[{}] Performing validation {:04d}/{:04d}, Examples/Sec = {:.2f}, "
               "Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%A %H:%M"), valid_step, num_batches,
-            examples_per_second.average(), loss.data[0], acc
+            examples_per_second.average(), acc, loss.data[0]
         ))
 
         # Save one validation example from the first batch
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_path', type=str, default='./output/', help='Root path for dataset.')
 
     # Optimization options
-    parser.add_argument('--epochs', type=int, default=30, help='Number of epochs to train.')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs to train.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
     parser.add_argument('--valid_frac', type=float, default=0.1, help='Fraction of dataset to use for validation.')
 
