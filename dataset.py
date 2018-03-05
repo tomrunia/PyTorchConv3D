@@ -25,7 +25,7 @@ import torch
 import torch.utils.data
 import torchvision.transforms
 from torch.utils.data.sampler import SubsetRandomSampler
-from transform.spatial import *
+from video_transform.spatial import *
 
 
 
@@ -120,8 +120,8 @@ def init_datasets(data_path, valid_frac, batch_size, num_workers,
     ])
 
     # Initialize training and validation dataset
-    train_data = BlenderSyntheticDataset(dataset_path=data_path, spatial_transform=train_transform)
-    valid_data = BlenderSyntheticDataset(dataset_path=data_path, spatial_transform=valid_transform)
+    train_data = BlenderSyntheticDataset(data_path, spatial_transform=train_transform)
+    valid_data = BlenderSyntheticDataset(data_path, spatial_transform=valid_transform)
 
     # Determine which examples to use for training and validation
     num_examples = len(train_data)
