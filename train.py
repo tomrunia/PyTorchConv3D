@@ -264,6 +264,9 @@ if __name__ == "__main__":
         summary_writer.add_scalar('validation/accuracy', epoch_val_acc, epoch_first_step)
         is_best = epoch_val_acc > best_val_acc
 
+        if is_best:
+            print("[{}] Found new best model, saving it ...")
+
         # Save the model after each epoch
         if checkpoint_path is not None and epoch % args.checkpoint_interval == 0:
             if not os.path.exists(checkpoint_path):
