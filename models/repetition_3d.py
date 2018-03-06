@@ -35,19 +35,22 @@ class Conv3D_Repetition(nn.Module):
 
         self.relu  = nn.ReLU(inplace=True)
 
-        self.conv1 = nn.Conv3d(1, 10, kernel_size=3, bias=False)
+        self.conv1 = nn.Conv3d(1, 10, kernel_size=3, stride=1, bias=False)
         self.bn1   = nn.BatchNorm3d(10)
 
-        self.conv2 = nn.Conv3d(10, 32, kernel_size=3, bias=False)
+        self.conv2 = nn.Conv3d(10, 32, kernel_size=3, stride=1, bias=False)
         self.bn2   = nn.BatchNorm3d(32)
 
-        self.conv3 = nn.Conv3d(32, 64, kernel_size=3, bias=False)
+        self.conv3 = nn.Conv3d(32, 64, kernel_size=3, stride=1, bias=False)
         self.bn3   = nn.BatchNorm3d(64)
 
-        self.fc4   = nn.Linear(62720, 512, bias=False)
-        self.bn4   = nn.BatchNorm1d(512)
+        self.fc4   = nn.Linear(62720, 256, bias=False)
+        self.bn4   = nn.BatchNorm1d(256)
 
-        self.output = nn.Linear(512, self.num_classes, bias=False)
+        self.fc5   = nn.Linear(256, 256, bias=False)
+        self.bn5   = nn.BatchNorm1d(256)
+
+        self.output = nn.Linear(256, self.num_classes, bias=False)
 
         ########################################################################
 
@@ -63,26 +66,28 @@ class Conv3D_Repetition(nn.Module):
 
         x = self.conv1(x)
         x = self.relu(x)
-        x = self.bn1(x)
         x = F.max_pool3d(x, kernel_size=(2,2,2), stride=(2,2,2))
-        #print('Layer #1: {}'.format(x.shape))
+        x = self.bn1(x)
+
 
         x = self.conv2(x)
         x = self.relu(x)
-        x = self.bn2(x)
         x = F.max_pool3d(x, kernel_size=(2,2,2), stride=(2,2,2))
-        #print('Layer #2: {}'.format(x.shape))
+        x = self.bn2(x)
 
         x = self.conv3(x)
         x = self.relu(x)
-        x = self.bn3(x)
         x = F.max_pool3d(x, kernel_size=(2,2,2), stride=(1,2,2))
-        #print('Layer #3: {}'.format(x.shape))
+        x = self.bn3(x)
 
         x = x.view(x.size(0), -1) #-1, self.num_flat_features(x))
         x = self.fc4(x)
         x = self.relu(x)
         x = self.bn4(x)
+
+        x = self.fc5(x)
+        x = self.relu(x)
+        x = self.bn5(x)
 
         x = F.dropout(x, p=self.drop_rate, training=self.training, inplace=True)
 

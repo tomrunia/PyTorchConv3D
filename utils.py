@@ -46,7 +46,8 @@ class AverageMeter(object):
         return self.values[-1]
 
     def average(self):
-        return np.mean(self.values)
+        num_avg = min(self.history, self.num_recorded)
+        return np.mean(self.values[-num_avg:])
 
     def reset(self):
         self.values = np.zeros(self.history, dtype=np.float32)

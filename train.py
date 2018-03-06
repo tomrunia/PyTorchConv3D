@@ -30,7 +30,9 @@ from torch.optim.lr_scheduler import StepLR
 from torch.autograd import Variable
 import torchvision.utils
 
-from models.conv3d import Conv3D_Repetition
+import models.repetition_3d as repetition_3d
+import models.resnet_3d as resnet_3d
+
 from dataset import init_datasets
 from utils import *
 
@@ -185,7 +187,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate.')
     parser.add_argument('--learning_rate_decay_factor', type=float, default=0.1, help='Learning rate decay factor.')
     parser.add_argument('--learning_rate_decay_epochs', type=int, default=20, help='After how many epochs to decay learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=7e-4, help='Weight decay on trainable parameters.')
+    parser.add_argument('--weight_decay', type=float, default=1e-4, help='Weight decay on trainable parameters.')
     parser.add_argument('--drop_rate', type=float, default=0.5, help='Dropout rate for last fully-connected layer.')
 
     # Acceleration
@@ -220,7 +222,13 @@ if __name__ == "__main__":
     ############################################################################
 
     # Define the network
-    net = Conv3D_Repetition(num_classes=len(classes))
+    #net = Conv3D_Repetition(num_classes=len(classes))
+    net = resnet_3d.resnet18(
+        num_classes=len(classes),
+        shortcut_type='B',
+        sample_size=100,
+        sample_duration=20)
+
     if args.num_gpu > 0: net.cuda()
 
     # Loss criterion and optimizer
