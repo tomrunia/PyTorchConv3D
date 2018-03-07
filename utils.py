@@ -69,3 +69,8 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
         directory = os.path.dirname(filename)
         shutil.copyfile(filename, os.path.join(directory, 'checkpoint_best.pth.tar'))
 
+def convert_timedelta(duration):
+    hours, remainder = divmod(duration, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return int(hours), int(minutes), int(seconds)
+

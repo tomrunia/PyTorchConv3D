@@ -250,8 +250,11 @@ if __name__ == "__main__":
     best_val_loss = np.inf
     best_val_acc  = 0.0
 
+    train_start_time = time.time()
+
     for epoch in range(args.epochs):
 
+        print("Starting Epoch {}.".format(epoch))
         epoch_first_step = epoch*len(train_loader)
 
         # Perform optimization for one epoch
@@ -272,6 +275,7 @@ if __name__ == "__main__":
         summary_writer.add_scalar('validation/accuracy', epoch_val_acc, epoch_first_step)
         is_best = epoch_val_acc > best_val_acc
 
+        print("#"*60)
         if is_best:
             print("[{}] Found new best model, saving it ...".format(datetime.now().strftime("%A %H:%M")))
 
@@ -287,6 +291,7 @@ if __name__ == "__main__":
             }
             save_checkpoint(states, is_best, save_file_path)
             print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%A %H:%M"), save_file_path))
+            print("#"*60)
 
         # Keep track of the best validation performance
         if epoch_val_acc > best_val_acc:
@@ -297,4 +302,6 @@ if __name__ == "__main__":
     summary_writer.export_scalars_to_json(os.path.join(args.output_path, 'train_summary.json'))
     summary_writer.close()
 
-
+    duration = time.time() - train_start_time
+    hours, minutes, seconds = convert_timedelta(duration)
+    print("Training complete in {:02d} hours, {:02d} minutes and {:02d} seconds.".format(hours, minutes, seconds))
