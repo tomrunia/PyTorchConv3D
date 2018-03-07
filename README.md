@@ -1,3 +1,3 @@
 # PyTorch 3D ConvNet
 
-Simple 3D ConvNet in PyTorch.
+Training and testing 3D ConvNets in PyTorch.
