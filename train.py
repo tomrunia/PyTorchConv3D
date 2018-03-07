@@ -91,8 +91,8 @@ def train(epoch, net, criterion, data_loader, optimizer, learning_rate_scheduler
 
         curr_learning_rate = learning_rate_scheduler.get_lr()[0]
 
-        print("[{}] Epoch {}, Train Step {:04d}/{:04d}, Batch Size = {}, Examples/Sec = {:.2f}, "
-              "LR = {:.4f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+        print("[{}] Epoch {}, Step {:04d}/{:04d}, BatchSize = {}, Examples/Sec = {:.2f}, "
+              "LR = {:.2e}, Accuracy = {:.3f}, Loss = {:.3f}".format(
             datetime.now().strftime("%A %H:%M"), epoch+1, step_in_batch, len(data_loader),
             args.batch_size, examples_per_second.average(), curr_learning_rate,
             accuracies.average(), losses.average()
@@ -165,7 +165,7 @@ def validate(net, criterion, data_loader):
     print("VALIDATION SUMMARY ({} batches):".format(len(data_loader)))
     print("  Loss:     {:.3f}".format(val_loss))
     print("  Accuracy: {:.3f}".format(val_acc))
-    print("#"*60)
+    print("#"*80)
 
     return val_loss, val_acc
 
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_path', type=str, default='./output/', help='Root path for dataset.')
 
     # Optimization options
-    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs to train.')
+    parser.add_argument('--epochs', type=int, default=2, help='Number of epochs to train.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
     parser.add_argument('--valid_frac', type=float, default=0.1, help='Fraction of dataset to use for validation.')
 
@@ -254,7 +254,10 @@ if __name__ == "__main__":
 
     for epoch in range(args.epochs):
 
-        print("Starting Epoch {}.".format(epoch))
+        epoch_start_time = time.time()
+
+        print("[{}] Starting Epoch {} (out of {}).".format(
+            datetime.now().strftime("%A %H:%M"), epoch+1, args.epochs))
         epoch_first_step = epoch*len(train_loader)
 
         # Perform optimization for one epoch
@@ -275,7 +278,6 @@ if __name__ == "__main__":
         summary_writer.add_scalar('validation/accuracy', epoch_val_acc, epoch_first_step)
         is_best = epoch_val_acc > best_val_acc
 
-        print("#"*60)
         if is_best:
             print("[{}] Found new best model, saving it ...".format(datetime.now().strftime("%A %H:%M")))
 
@@ -291,17 +293,23 @@ if __name__ == "__main__":
             }
             save_checkpoint(states, is_best, save_file_path)
             print("[{}] Saved model checkpoint: {}".format(datetime.now().strftime("%A %H:%M"), save_file_path))
-            print("#"*60)
 
         # Keep track of the best validation performance
         if epoch_val_acc > best_val_acc:
             best_val_acc  = epoch_val_acc
             best_val_loss = epoch_val_loss
 
+        epoch_duration = time.time() - epoch_start_time
+        hours, minutes, seconds = convert_timedelta(epoch_duration)
+        print("[{}] Epoch complete in {} hours, {} minutes and {} seconds.".format(
+            datetime.now().strftime("%A %H:%M"), hours, minutes, seconds))
+        print("#"*80)
+
     # Save JSON file of scalars to disk
     summary_writer.export_scalars_to_json(os.path.join(args.output_path, 'train_summary.json'))
     summary_writer.close()
 
-    duration = time.time() - train_start_time
-    hours, minutes, seconds = convert_timedelta(duration)
-    print("Training complete in {:02d} hours, {:02d} minutes and {:02d} seconds.".format(hours, minutes, seconds))
+    train_duration = time.time() - train_start_time
+    hours, minutes, seconds = convert_timedelta(train_duration)
+    print("[{}] Training complete in {} hours, {} minutes and {} seconds.".format(
+        datetime.now().strftime("%A %H:%M"), hours, minutes, seconds))

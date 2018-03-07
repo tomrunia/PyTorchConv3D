@@ -96,7 +96,7 @@ class BlenderSyntheticDataset(torch.utils.data.Dataset):
 def init_datasets(data_path, valid_frac, batch_size, num_workers,
                   shuffle_initial=False, shuffle_seed=1234):
 
-    print("#"*60)
+    print("#"*80)
     print("Initializing data loaders... ")
 
     # Define the input pipeline
@@ -120,7 +120,7 @@ def init_datasets(data_path, valid_frac, batch_size, num_workers,
     valid_data = BlenderSyntheticDataset(data_path, spatial_transform=valid_transform)
 
     # Determine which examples to use for training and validation
-    num_examples = len(train_data)
+    num_examples = 1000 #len(train_data)
     indices = np.arange(0, num_examples)
     split = int(np.floor(valid_frac * num_examples))
 
@@ -146,7 +146,7 @@ def init_datasets(data_path, valid_frac, batch_size, num_workers,
     print("Validation Fraction:     {:.2f}".format(valid_frac))
     print("Num Train examples:      {}".format(len(train_idx)))
     print("Num Validation examples: {}".format(len(valid_idx)))
-    print("#"*60)
+    print("#"*80)
 
     return train_loader, valid_loader, train_data.labels
 
