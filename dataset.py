@@ -120,7 +120,7 @@ def init_datasets(data_path, valid_frac, batch_size, num_workers,
     valid_data = BlenderSyntheticDataset(data_path, spatial_transform=valid_transform)
 
     # Determine which examples to use for training and validation
-    num_examples = 1000 #len(train_data)
+    num_examples = len(train_data)
     indices = np.arange(0, num_examples)
     split = int(np.floor(valid_frac * num_examples))
 
