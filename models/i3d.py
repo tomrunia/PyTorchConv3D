@@ -323,7 +323,6 @@ class InceptionI3d(nn.Module):
     def _init_weights(self, modules):
         for m in modules:
             if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                print('FOUND CONV3D or LINEAR')
                 m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
             elif isinstance(m, nn.BatchNorm3d):
                 m.weight.data.fill_(1)
@@ -350,6 +349,14 @@ class InceptionI3d(nn.Module):
     def freeze_weights(self):
         for param in self.parameters():
             param.requires_grad = False
+
+    def set_finetune_layers(self, prefixes):
+        assert isinstance(prefixes, list)
+        for param_name, param in self.named_parameters():
+            for prefix in prefixes:
+                if prefix in param_name:
+                    param.requires_grad = True
+                    break
 
     def trainable_params(self):
         params = []

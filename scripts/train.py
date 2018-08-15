@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import time
 from datetime import datetime
 
@@ -60,7 +61,7 @@ if config.checkpoint_path:
     layer_names = set([k.split('.')[0] for k in checkpoint_state_dict.keys()])
     print('  Restored weights: {}'.format(layer_names))
 
-# Disabling finetuning for early layers
+# Disabling finetuning for all layers
 net.freeze_weights()
 
 # Replace last layer with different number of logits when finetuning
@@ -69,6 +70,11 @@ if config.num_classes != config.num_finetune_classes:
         datetime.now().strftime("%A %H:%M"), config.num_finetune_classes))
     net.replace_logits(config.num_finetune_classes)
 
+# Enable gradient for layers to finetune
+finetune_prefixes = config.finetune_prefixes.split(',')
+net.set_finetune_layers(finetune_prefixes)
+
+# Obtain parameters to be fed into the optimizer
 params_to_train = net.trainable_params()
 net = net.to(device)
 
@@ -163,6 +169,8 @@ for epoch in range(config.num_epochs):
                 examples_per_second.average(), accuracies.average(),
                 losses.average()))
 
-    # TODO: evaluation and model saving after each epoch.
+    save_checkpoint_path = os.path.join(config.save_model_path, 'model_{:03}.ptk'.format(epoch))
+    print('Saving checkpoint to: {}'.format(save_checkpoint_path))
+    torch.save(net.state_dict(), save_checkpoint_path)
 
 print('Finished training.')
