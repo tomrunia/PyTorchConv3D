@@ -25,6 +25,7 @@ def get_training_set(config, spatial_transform, temporal_transform, target_trans
     assert config.dataset in ['kinetics', 'activitynet', 'ucf101', 'blender']
 
     if config.dataset == 'kinetics':
+
         training_data = Kinetics(
             config.video_path,
             config.annotation_path,
@@ -32,7 +33,9 @@ def get_training_set(config, spatial_transform, temporal_transform, target_trans
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
             target_transform=target_transform)
+
     elif config.dataset == 'activitynet':
+
         training_data = ActivityNet(
             config.video_path,
             config.annotation_path,
@@ -41,7 +44,9 @@ def get_training_set(config, spatial_transform, temporal_transform, target_trans
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
             target_transform=target_transform)
+
     elif config.dataset == 'ucf101':
+
         training_data = UCF101(
             config.video_path,
             config.annotation_path,
@@ -49,7 +54,9 @@ def get_training_set(config, spatial_transform, temporal_transform, target_trans
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
             target_transform=target_transform)
+
     elif config.dataset == 'blender':
+
         training_data = BlenderSyntheticDataset(
             root_path=config.video_path,
             spatial_transform=spatial_transform,
@@ -71,6 +78,7 @@ def get_validation_set(config, spatial_transform, temporal_transform, target_tra
         return None
 
     if config.dataset == 'kinetics':
+
         validation_data = Kinetics(
             config.video_path,
             config.annotation_path,
@@ -80,7 +88,9 @@ def get_validation_set(config, spatial_transform, temporal_transform, target_tra
             temporal_transform,
             target_transform,
             sample_duration=config.sample_duration)
+
     elif config.dataset == 'activitynet':
+
         validation_data = ActivityNet(
             config.video_path,
             config.annotation_path,
@@ -91,7 +101,9 @@ def get_validation_set(config, spatial_transform, temporal_transform, target_tra
             temporal_transform,
             target_transform,
             sample_duration=config.sample_duration)
+
     elif config.dataset == 'ucf101':
+
         validation_data = UCF101(
             config.video_path,
             config.annotation_path,
@@ -101,6 +113,7 @@ def get_validation_set(config, spatial_transform, temporal_transform, target_tra
             temporal_transform,
             target_transform,
             sample_duration=config.sample_duration)
+
     elif config.dataset == 'blender':
         raise NotImplementedError('blender validation set not implemented')
 
@@ -120,6 +133,7 @@ def get_test_set(config, spatial_transform, temporal_transform, target_transform
         subset = 'testing'
 
     if config.dataset == 'kinetics':
+
         test_data = Kinetics(
             config.video_path,
             config.annotation_path,
@@ -129,7 +143,9 @@ def get_test_set(config, spatial_transform, temporal_transform, target_transform
             temporal_transform,
             target_transform,
             sample_duration=config.sample_duration)
+
     elif config.dataset == 'activitynet':
+
         test_data = ActivityNet(
             config.video_path,
             config.annotation_path,
@@ -140,7 +156,9 @@ def get_test_set(config, spatial_transform, temporal_transform, target_transform
             temporal_transform,
             target_transform,
             sample_duration=config.sample_duration)
+
     elif config.dataset == 'ucf101':
+
         test_data = UCF101(
             config.video_path,
             config.annotation_path,
@@ -182,6 +200,7 @@ def get_data_loaders(config, spatial_transform, temporal_transform, target_trans
     # Validation loader does not always exist
     dataset_validation = get_validation_set(config, spatial_transform, temporal_transform, target_transform)
     if dataset_validation is not None:
-        data_loaders['train'] = DataLoader(dataset_validation, config.batch_size, shuffle=False, num_workers=config.num_workers, pin_memory=True)
+        print('Found {} validation examples'.format(len(dataset_validation)))
+        data_loaders['validation'] = DataLoader(dataset_validation, config.batch_size, shuffle=False, num_workers=config.num_workers, pin_memory=True)
 
     return data_loaders

@@ -104,14 +104,16 @@ def modify_frame_indices(video_dir_path, frame_indices):
     return modified_indices
 
 
-def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
-                 sample_duration):
+def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video, sample_duration):
+
     data = load_annotation_data(annotation_path)
     video_names, annotations = get_video_names_and_annotations(data, subset)
     class_to_idx = get_class_labels(data)
     idx_to_class = {}
     for name, label in class_to_idx.items():
         idx_to_class[label] = name
+
+
 
     dataset = []
     for i in range(len(video_names)):
@@ -120,12 +122,14 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
         video_path = os.path.join(root_path, video_names[i])
         if not os.path.exists(video_path):
+            #raise ValueError('video_path does not exist: {}'.format(video_path))
             continue
 
         fps_file_path = os.path.join(video_path, 'fps')
         fps = load_value_file(fps_file_path)
 
         for annotation in annotations[i]:
+
             begin_t = math.ceil(annotation['segment'][0] * fps)
             end_t = math.ceil(annotation['segment'][1] * fps)
             if begin_t == 0:

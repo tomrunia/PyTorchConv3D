@@ -141,7 +141,7 @@ class DenseNet(nn.Module):
     """
 
     def __init__(self,
-                 sample_size,
+                 spatial_size,
                  sample_duration,
                  growth_rate=32,
                  block_config=(6, 12, 24, 16),
@@ -152,7 +152,7 @@ class DenseNet(nn.Module):
 
         super(DenseNet, self).__init__()
 
-        self.sample_size = sample_size
+        self.spatial_size = spatial_size
         self.sample_duration = sample_duration
 
         # First convolution
@@ -194,7 +194,7 @@ class DenseNet(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
-                m.weight = nn.init.kaiming_normal(m.weight, mode='fan_out')
+                m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
             elif isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -206,7 +206,7 @@ class DenseNet(nn.Module):
         features = self.features(x)
         out = F.relu(features, inplace=True)
         last_duration = int(math.ceil(self.sample_duration / 16))
-        last_size = int(math.floor(self.sample_size / 32))
+        last_size = int(math.floor(self.spatial_size / 32))
         out = F.avg_pool3d(
             out, kernel_size=(last_duration, last_size, last_size)).view(
                 features.size(0), -1)

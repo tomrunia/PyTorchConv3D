@@ -180,7 +180,7 @@ class InceptionModule(nn.Module):
 ####################################################################
 
 
-class InceptionI3d(nn.Module):
+class InceptionI3D(nn.Module):
     """Inception-v1 I3D architecture.
     The model is introduced in:
         Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
@@ -239,7 +239,7 @@ class InceptionI3d(nn.Module):
         if final_endpoint not in self.VALID_ENDPOINTS:
             raise ValueError('Unknown final endpoint %s' % final_endpoint)
 
-        super(InceptionI3d, self).__init__()
+        super(InceptionI3D, self).__init__()
 
         self._model_name      = name
         self._num_classes     = num_classes

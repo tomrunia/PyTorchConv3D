@@ -10,17 +10,26 @@ def parse_opts():
     parser.add_argument('--video_path', type=str, required=True, help='Path to location of dataset videos')
     parser.add_argument('--annotation_path', type=str, required=False, help='Path to location of dataset annotation file')
     parser.add_argument('--num_val_samples', type=int, default=3, help='Number of validation samples for each activity')
-
     parser.add_argument('--norm_value', default=255, type=int, help='Divide inputs by 255 or 1')
-
     parser.add_argument('--num_classes', default=400, type=int, help= 'Number of classes (activitynet: 200, kinetics: 400, ucf101: 101, hmdb51: 51)')
     parser.add_argument('--spatial_size', default=224, type=int, help='Height and width of inputs')
-    parser.add_argument('--temporal_size', default=64, type=int, help='Temporal duration of inputs')
+    parser.add_argument('--sample_duration', default=64, type=int, help='Temporal duration of inputs')
+
+    # Models (general)
+    parser.add_argument('--model', default='i3d', type=str, help='(i3d | resnet | preresnet | wideresnet | resnext | densenet)')
+
+    # Models (3D-ResNet specific)
+    parser.add_argument('--model_depth', default=18, type=int, help='Depth of resnet (10 | 18 | 34 | 50 | 101)')
+    parser.add_argument('--resnet_shortcut', default='B', type=str, help='Shortcut type of resnet (A | B)')
+    parser.add_argument('--wide_resnet_k', default=2, type=int, help='Wide resnet k')
+    parser.add_argument('--resnext_cardinality', default=32, type=int, help='ResNeXt cardinality')
+    parser.add_argument('--manual_seed', default=1, type=int, help='Manually set random seed')
 
     # Finetuning
     parser.add_argument('--resume_path', default='', type=str, help='Checkpoint file (.pth) of previous training')
-    parser.add_argument('--num_finetune_classes', default=36, type=int, help='Number of classes for fine-tuning. n_classes is set to the number when pretraining.')
-    parser.add_argument('--finetune_prefixes', default='logits,Mixed_5', type=str, help='Prefixes of layers to finetune, comma seperated.')
+    parser.add_argument('--num_finetune_classes', default=36, type=int, help='Number of classes for fine-tuning. num_classes is set to the number when pretraining.')
+    parser.add_argument('--finetune_prefixes', default='logits,Mixed_5', type=str, help='Prefixes of layers to finetune, comma seperated (only used by I3D).')
+    parser.add_argument('--finetune_begin_index', default=0, type=int, help='Begin block index of fine-tuning (not used by I3D).')
 
     # Optimization
     parser.add_argument('--optimizer', default='adam', type=str, help='Which optimizer to use (SGD | adam | rmsprop)')
