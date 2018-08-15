@@ -23,8 +23,10 @@ from datetime import datetime
 
 import torch.nn as nn
 
-#from transforms.temporal_transforms import LoopPadding, TemporalRandomCrop
-#from transforms.target_transforms import ClassLabel, VideoID
+from transforms.spatial_transforms import RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor, Normalize
+
+from transforms.temporal_transforms import LoopPadding, TemporalRandomCrop
+from transforms.target_transforms import ClassLabel, VideoID
 #from transforms.target_transforms import Compose as TargetCompose
 
 from utils.utils import *
@@ -52,17 +54,27 @@ model = model.to(device)
 ####################################################################
 ####################################################################
 
+# Determine cropping scales
+config.scales = [config.initial_scale]
+for i in range(1, config.num_scales):
+    config.scales.append(config.scales[-1] * config.scale_step)
+
 spatial_transform = Compose([
+    MultiScaleRandomCrop(config.scales, config.spatial_size),
     RandomHorizontalFlip(),
     ToTensor(config.norm_value),
     Normalize([0, 0, 0], [1, 1, 1])
 ])
-temporal_transform = None  # TemporalRandomCrop(temporal_size)
-target_transform   = None  # ClassLabel()
+
+temporal_transform = TemporalRandomCrop(config.sample_duration)
+target_transform   = ClassLabel()
+
+####################################################################
+####################################################################
 
 # Obtain 'train' and 'validation' loaders
 print('[{}] Preparing datasets...'.format(datetime.now().strftime("%A %H:%M")))
-data_loaders = get_data_loaders(config, spatial_transform, temporal_transform, target_transform)
+data_loaders, datasets = get_data_loaders(config, spatial_transform, temporal_transform, target_transform)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
 ####################################################################
@@ -80,6 +92,10 @@ optimizer = get_optimizer(
     params_to_train, config.optimizer, config.learning_rate,
     config.momentum, config.weight_decay)
 
+# Learning rate scheduler
+milestones = [int(x) for x in config.lr_scheduler_milestones.split(',')]
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones, config.lr_scheduler_gamma)
+
 ####################################################################
 ####################################################################
 # Good example: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
@@ -96,6 +112,8 @@ for epoch in range(config.num_epochs):
             model.train()
         else:
             model.eval()
+            val_losses = []
+            val_accuracies = []
 
         for step, (clips, targets) in enumerate(data_loaders[phase]):
 
@@ -112,8 +130,8 @@ for epoch in range(config.num_epochs):
             logits = model.forward(clips)
 
             # Only for ResNet etc. [n_batch,400] => [n_batch,400,1]
-            if logits.dim() == 2:
-                logits = logits.unsqueeze(-1)
+            #if logits.dim() == 2:
+            #   logits = logits.unsqueeze(-1)
 
             _, preds = torch.max(logits, 1)
             loss = criterion(logits, targets)
@@ -129,20 +147,31 @@ for epoch in range(config.num_epochs):
                 loss.backward()
                 optimizer.step()
 
-            # Update average statistics
-            examples_per_second.push(step_time)
-            losses.push(loss.item())
-            accuracies.push(accuracy.item())
+            if phase == 'train':
 
-            print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                      "Accuracy = {:.3f}, Loss = {:.3f}".format(
-                    datetime.now().strftime("%A %H:%M"), epoch+1, step, len(data_loaders[phase])//config.batch_size,
-                    examples_per_second.average(), accuracies.average(),
-                    losses.average()))
+                # Update average statistics
+                examples_per_second.push(step_time)
+                losses.push(loss.item())
+                accuracies.push(accuracy.item())
+
+                print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
+                          "Accuracy = {:.3f}, Loss = {:.3f}".format(
+                        datetime.now().strftime("%A %H:%M"), epoch+1, step,
+                        len(datasets[phase])//config.batch_size, examples_per_second.average(),
+                        accuracies.average(), losses.average()))
+
+            else:
+                print("[{}] Epoch {}. Validation Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
+                          "Accuracy = {:.3f}, Loss = {:.3f}".format(
+                        datetime.now().strftime("%A %H:%M"), epoch+1, step,
+                        len(datasets[phase])//config.batch_size,
+                        step_time, accuracy.item(), loss.item()))
+
+        if phase == 'train':
+            scheduler.step(epoch)
 
         save_checkpoint_path = os.path.join(config.save_path, 'save_{:03}.pth'.format(epoch))
         print('Checkpoint written to: {}'.format(save_checkpoint_path))
         save_checkpoint(save_checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
-
 
 print('Finished training.')

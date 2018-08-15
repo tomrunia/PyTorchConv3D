@@ -12,11 +12,17 @@ def parse_opts():
     parser.add_argument('--num_val_samples', type=int, default=3, help='Number of validation samples for each activity')
     parser.add_argument('--norm_value', default=255, type=int, help='Divide inputs by 255 or 1')
     parser.add_argument('--num_classes', default=400, type=int, help= 'Number of classes (activitynet: 200, kinetics: 400, ucf101: 101, hmdb51: 51)')
+
+    # Preprocessing pipeline
     parser.add_argument('--spatial_size', default=224, type=int, help='Height and width of inputs')
     parser.add_argument('--sample_duration', default=64, type=int, help='Temporal duration of inputs')
+    parser.add_argument('--initial_scale', default=1.0, type=float, help='Initial scale for multiscale cropping')
+    parser.add_argument('--num_scales', default=5, type=int, help='Number of scales for multiscale cropping')
+    parser.add_argument('--scale_step', default=0.84089641525, type=float, help='Scale step for multiscale cropping')
 
     # Models (general)
     parser.add_argument('--model', default='i3d', type=str, help='(i3d | resnet | preresnet | wideresnet | resnext | densenet)')
+    parser.add_argument('--dropout_keep_prob', default=1.0, type=float, help='Dropout keep probability')
 
     # Models (3D-ResNet specific)
     parser.add_argument('--model_depth', default=18, type=int, help='Depth of resnet (10 | 18 | 34 | 50 | 101)')
@@ -33,12 +39,13 @@ def parse_opts():
 
     # Optimization
     parser.add_argument('--optimizer', default='adam', type=str, help='Which optimizer to use (SGD | adam | rmsprop)')
-    parser.add_argument('--learning_rate', default=0.01, type=float, help='Initial learning rate (divided by 10 while training by lr-scheduler)')
+    parser.add_argument('--learning_rate', default=0.1, type=float, help='Initial learning rate (divided by 10 while training by lr-scheduler)')
+    parser.add_argument('--lr_scheduler_milestones', default='25,50', type=str, help='Learning rate scheduling, when to multiply learning rate by gamma')
+    parser.add_argument('--lr_scheduler_gamma', default=0.1, type=float, help='Learning rate decay factor')
     parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
-    parser.add_argument('--weight_decay', default=1e-7, type=float, help='Weight Decay')
-    parser.add_argument('--batch_size', default=32, type=int, help='Batch Size')
-    parser.add_argument('--dropout_keep_prob', default=1.0, type=float, help='Dropout keep probability')
-    parser.add_argument('--num_epochs', default=20, type=int, help='Number of epochs to train for')
+    parser.add_argument('--weight_decay', default=1e-5, type=float, help='Weight Decay')
+    parser.add_argument('--batch_size', default=16, type=int, help='Batch Size')
+    parser.add_argument('--num_epochs', default=200, type=int, help='Number of epochs to train for')
 
     # Misc
     parser.add_argument('--device', default='cuda:0', help='Device string cpu | cuda:0')

@@ -189,18 +189,19 @@ def get_normalization_method(config):
 
 def get_data_loaders(config, spatial_transform, temporal_transform, target_transform):
 
-    # Define the data pipeline
-    dataset_train = get_training_set(config, spatial_transform, temporal_transform, target_transform)
+    datasets = dict()
     data_loaders = dict()
 
+    # Define the data pipeline
+    datasets['train'] = get_training_set(config, spatial_transform, temporal_transform, target_transform)
     data_loaders['train'] = DataLoader(
-        dataset_train, config.batch_size, shuffle=True,
+        datasets['train'], config.batch_size, shuffle=True,
         num_workers=config.num_workers, pin_memory=True)
 
     # Validation loader does not always exist
-    dataset_validation = get_validation_set(config, spatial_transform, temporal_transform, target_transform)
-    if dataset_validation is not None:
-        print('Found {} validation examples'.format(len(dataset_validation)))
-        data_loaders['validation'] = DataLoader(dataset_validation, config.batch_size, shuffle=False, num_workers=config.num_workers, pin_memory=True)
+    datasets['validation'] = get_validation_set(config, spatial_transform, temporal_transform, target_transform)
+    if datasets['validation'] is not None:
+        print('Found {} validation examples'.format(len(datasets['validation'])))
+        data_loaders['validation'] = DataLoader(datasets['validation'], config.batch_size, shuffle=False, num_workers=config.num_workers, pin_memory=True)
 
-    return data_loaders
+    return data_loaders, datasets
