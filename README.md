@@ -7,8 +7,6 @@ This repository contains PyTorch models of I3D and 3D-ResNets based on the follo
 - https://github.com/piergiaj/pytorch-i3d/blob/master/pytorch_i3d.py
 - https://github.com/kenshohara/3D-ResNets-PyTorch/
 
-The training or finetuning script can be found in `./scripts/train.py`
-
 ## References:
 
 - Carreira and Zisserman - "[Quo Vadis,

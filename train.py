@@ -21,21 +21,16 @@ import os
 import time
 from datetime import datetime
 
-import torch
 import torch.nn as nn
-
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, ToTensor
 
 #from transforms.temporal_transforms import LoopPadding, TemporalRandomCrop
 #from transforms.target_transforms import ClassLabel, VideoID
 #from transforms.target_transforms import Compose as TargetCompose
 
-from models.i3d import InceptionI3D
-
 from utils.utils import *
-from utils.data_factory import *
-from utils.model_factory import generate_model
-from utils.config import parse_opts
+from factory.data_factory import *
+from factory.model_factory import generate_model
+from config import parse_opts
 
 ####################################################################
 ####################################################################
