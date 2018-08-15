@@ -1,4 +1,6 @@
 import csv
+import json
+
 import numpy as np
 
 import torch
@@ -65,6 +67,10 @@ def print_config(config):
         print('  {:>20} {}'.format(k, v))
     print('#'*60)
 
+def write_config(config, json_path):
+    with open(json_path, 'w') as opt_file:
+        json.dump(vars(config), opt_file)
+
 def get_optimizer(params, optimizer_type, learning_rate, weight_decay, momentum=None):
     if optimizer_type == 'SGD':
         return torch.optim.SGD(params, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
@@ -73,3 +79,12 @@ def get_optimizer(params, optimizer_type, learning_rate, weight_decay, momentum=
     elif optimizer_type == 'adam':
         return torch.optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
     raise ValueError('Chosen optimizer is not supported, please choose from (SGD | adam | rmsprop)')
+
+def save_checkpoint(save_file_path, epoch, model_state_dict, optimizer_state_dict):
+    states = {'epoch': epoch+1, 'state_dict': model_state_dict, 'optimizer':  optimizer_state_dict}
+    torch.save(states, save_file_path)
+
+def load_value_file(file_path):
+    with open(file_path, 'r') as input_file:
+        value = float(input_file.read().rstrip('\n\r'))
+    return value

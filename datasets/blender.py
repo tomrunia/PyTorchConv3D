@@ -28,14 +28,12 @@ from torch.utils.data import Dataset
 
 class BlenderSyntheticDataset(Dataset):
 
-    def __init__(self, root_path, spatial_size, temporal_size, spatial_transform=None, temporal_transform=None, target_transform=None):
+    def __init__(self, root_path, spatial_transform=None, temporal_transform=None, target_transform=None):
 
         # work in progress
         assert temporal_transform is None
 
         self._root_path = root_path
-        self._spatial_size = spatial_size
-        self._temporal_size = temporal_size
 
         self._spatial_transform = spatial_transform
         self._temporal_transform = temporal_transform
@@ -75,9 +73,6 @@ class BlenderSyntheticDataset(Dataset):
         with h5py.File(self._data_files[container_idx], 'r') as hf:
             clip   = hf['videos'][example_idx]
             target = hf['labels'][example_idx]
-
-        #shape = (self._temporal_size,self._spatial_size,self._spatial_size,3)
-        #clip = np.random.uniform(0, 255, shape).astype(np.uint8)
 
         # Apply temporal transformations (i.e. temporal cropping, looping)
         #if self._temporal_transform is not None:

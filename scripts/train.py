@@ -23,7 +23,6 @@ from datetime import datetime
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 
 from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, ToTensor
 
@@ -32,8 +31,9 @@ from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFl
 #from transforms.target_transforms import Compose as TargetCompose
 
 from models.i3d import InceptionI3d
-from datasets.blender_synthetic import BlenderSyntheticDataset
-from utils.utils import AverageMeter, get_optimizer, print_config
+
+from utils.utils import *
+from utils.data_loaders import *
 from utils.config import parse_opts
 
 ####################################################################
@@ -50,10 +50,11 @@ device = torch.device(config.device)
 print('[{}] Initializing I3D model (num_classes={})...'.format(datetime.now().strftime("%A %H:%M"), config.num_classes))
 net = InceptionI3d(num_classes=config.num_classes, in_channels=3, dropout_keep_prob=config.dropout_keep_prob)
 
-if config.checkpoint_path:
-    print('[{}] Restoring pretrained weights from: {}...'.format(datetime.now().strftime("%A %H:%M"), config.checkpoint_path))
+if config.resume_path:
+
+    print('[{}] Restoring pretrained weights from: {}...'.format(datetime.now().strftime("%A %H:%M"), config.resume_path))
     model_dict = net.state_dict()
-    checkpoint_state_dict = torch.load(config.checkpoint_path)
+    checkpoint_state_dict = torch.load(config.resume_path)
     checkpoint_state_dict = {k: v for k, v in checkpoint_state_dict.items() if k in model_dict}
     net.load_state_dict(checkpoint_state_dict)
 
@@ -61,18 +62,18 @@ if config.checkpoint_path:
     layer_names = set([k.split('.')[0] for k in checkpoint_state_dict.keys()])
     print('  Restored weights: {}'.format(layer_names))
 
-# Disabling finetuning for all layers
-net.freeze_weights()
+    # Disabling finetuning for all layers
+    net.freeze_weights()
 
-# Replace last layer with different number of logits when finetuning
-if config.num_classes != config.num_finetune_classes:
-    print('[{}] Changing logits size for finetuning (num_classes={})...'.format(
-        datetime.now().strftime("%A %H:%M"), config.num_finetune_classes))
-    net.replace_logits(config.num_finetune_classes)
+    # Replace last layer with different number of logits when finetuning
+    if config.num_classes != config.num_finetune_classes:
+        print('[{}] Changing logits size for finetuning (num_classes={})...'.format(
+            datetime.now().strftime("%A %H:%M"), config.num_finetune_classes))
+        net.replace_logits(config.num_finetune_classes)
 
-# Enable gradient for layers to finetune
-finetune_prefixes = config.finetune_prefixes.split(',')
-net.set_finetune_layers(finetune_prefixes)
+    # Enable gradient for layers to finetune
+    finetune_prefixes = config.finetune_prefixes.split(',')
+    net.set_finetune_layers(finetune_prefixes)
 
 # Obtain parameters to be fed into the optimizer
 params_to_train = net.trainable_params()
@@ -91,17 +92,9 @@ target_transform   = None  # ClassLabel()
 
 print('[{}] Preparing datasets...'.format(datetime.now().strftime("%A %H:%M")))
 
-dataset = BlenderSyntheticDataset(
-    root_path=config.data_path,
-    spatial_size=config.spatial_size,
-    temporal_size=config.temporal_size,
-    spatial_transform=spatial_transform,
-    temporal_transform=temporal_transform,
-    target_transform=target_transform)
-
-train_loader = DataLoader(
-    dataset=dataset, batch_size=config.batch_size, shuffle=True,
-    num_workers=config.num_workers, pin_memory=True)
+# Obtain 'train' and 'validation' loaders
+data_loaders = get_data_loaders(config, spatial_transform, temporal_transform, target_transform)
+phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
 ####################################################################
 ####################################################################
@@ -120,57 +113,62 @@ optimizer = get_optimizer(
 
 ####################################################################
 ####################################################################
-
 # Good example: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
-phase = 'train'  # TODO: add 'validation'
+
 
 for epoch in range(config.num_epochs):
 
-    print('#'*60)
-    print('Starting epoch {}'.format(epoch+1))
+    for phase in phases:
 
-    net.train()
-
-    for step, (clips, targets) in enumerate(train_loader):
-
-        start_time = time.time()
-
-        # Prepare for next iteration
-        optimizer.zero_grad()
-
-        # Move inputs to GPU memory
-        clips   = clips.to(device)
-        targets = targets.to(device)
-
-        # Feed-forward through the network
-        logits = net.forward(clips)
-        _, preds = torch.max(logits, 1)
-        loss = criterion(logits, targets)
-
-        # Calculate accuracy
-        correct = torch.sum(preds == targets.data)
-        accuracy = correct.double() / config.batch_size
-
-        # Calculate elapsed time for this step
-        step_time = config.batch_size/float(time.time() - start_time)
+        print('#'*60)
+        print('Starting {} epoch {}'.format(epoch+1, phase))
 
         if phase == 'train':
-            loss.backward()
-            optimizer.step()
+            net.train()
+        else:
+            net.eval()
 
-        # Update average statistics
-        examples_per_second.push(step_time)
-        losses.push(loss.item())
-        accuracies.push(accuracy.item())
+        for step, (clips, targets) in enumerate(data_loaders[phase]):
 
-        print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                  "Accuracy = {:.3f}, Loss = {:.3f}".format(
-                datetime.now().strftime("%A %H:%M"), epoch+1, step, len(dataset)//config.batch_size,
-                examples_per_second.average(), accuracies.average(),
-                losses.average()))
+            start_time = time.time()
 
-    save_checkpoint_path = os.path.join(config.save_model_path, 'model_{:03}.ptk'.format(epoch))
-    print('Saving checkpoint to: {}'.format(save_checkpoint_path))
-    torch.save(net.state_dict(), save_checkpoint_path)
+            # Prepare for next iteration
+            optimizer.zero_grad()
+
+            # Move inputs to GPU memory
+            clips   = clips.to(device)
+            targets = targets.to(device)
+
+            # Feed-forward through the network
+            logits = net.forward(clips)
+            _, preds = torch.max(logits, 1)
+            loss = criterion(logits, targets)
+
+            # Calculate accuracy
+            correct = torch.sum(preds == targets.data)
+            accuracy = correct.double() / config.batch_size
+
+            # Calculate elapsed time for this step
+            step_time = config.batch_size/float(time.time() - start_time)
+
+            if phase == 'train':
+                loss.backward()
+                optimizer.step()
+
+            # Update average statistics
+            examples_per_second.push(step_time)
+            losses.push(loss.item())
+            accuracies.push(accuracy.item())
+
+            print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
+                      "Accuracy = {:.3f}, Loss = {:.3f}".format(
+                    datetime.now().strftime("%A %H:%M"), epoch+1, step, len(data_loaders[phase])//config.batch_size,
+                    examples_per_second.average(), accuracies.average(),
+                    losses.average()))
+
+        save_checkpoint_path = os.path.join(config.save_path, 'save_{:03}.pth'.format(epoch))
+        print('Checkpoint written to: {}'.format(save_checkpoint_path))
+        save_checkpoint(save_checkpoint_path, epoch, net.state_dict(), optimizer.state_dict())
+
 
 print('Finished training.')
