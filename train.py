@@ -23,22 +23,28 @@ from datetime import datetime
 
 import torch.nn as nn
 
-from transforms.spatial_transforms import RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor, Normalize
-
-from transforms.temporal_transforms import LoopPadding, TemporalRandomCrop
-from transforms.target_transforms import ClassLabel, VideoID
-#from transforms.target_transforms import Compose as TargetCompose
+from transforms.spatial_transforms import Compose, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor
+from transforms.temporal_transforms import TemporalRandomCrop
+from transforms.target_transforms import ClassLabel
 
 from utils.utils import *
 from factory.data_factory import *
 from factory.model_factory import generate_model
 from config import parse_opts
 
+from tensorboardX import SummaryWriter
+
 ####################################################################
 ####################################################################
 
 config = parse_opts()
+config = prepare_output_dirs(config)
+
 print_config(config)
+write_config(config, os.path.join(config.save_dir, 'config.json'))
+
+# TensorboardX summary writer
+writer = SummaryWriter(log_dir=config.log_dir)
 
 ####################################################################
 ####################################################################
@@ -48,7 +54,7 @@ device = torch.device(config.device)
 print('[{}] Initializing {} model (num_classes={})...'.format(datetime.now().strftime("%A %H:%M"), config.model, config.num_classes))
 
 # Returns the network instance (I3D, 3D-ResNet etc.)
-model, params_to_train = generate_model(config)
+model, params_to_train = generate_model(config)  # TODO: check what goes wrong here
 model = model.to(device)
 
 ####################################################################
@@ -87,10 +93,9 @@ accuracies = AverageMeter(config.history_steps)
 ####################################################################
 ####################################################################
 
+# TODO: why does params_to_train instead of model.parameters() not work?
 criterion = nn.CrossEntropyLoss()
-optimizer = get_optimizer(
-    params_to_train, config.optimizer, config.learning_rate,
-    config.momentum, config.weight_decay)
+optimizer = get_optimizer(config, model.parameters())
 
 # Learning rate scheduler
 milestones = [int(x) for x in config.lr_scheduler_milestones.split(',')]
@@ -99,6 +104,8 @@ scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones, config.l
 ####################################################################
 ####################################################################
 # Good example: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
+
+train_steps_per_epoch = int(np.ceil(len(datasets['train'])/config.batch_size))
 
 for epoch in range(config.num_epochs):
 
@@ -149,18 +156,29 @@ for epoch in range(config.num_epochs):
 
             if phase == 'train':
 
+                global_step = (epoch*train_steps_per_epoch) + step
+
                 # Update average statistics
                 examples_per_second.push(step_time)
                 losses.push(loss.item())
                 accuracies.push(accuracy.item())
 
-                print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                          "Accuracy = {:.3f}, Loss = {:.3f}".format(
-                        datetime.now().strftime("%A %H:%M"), epoch+1, step,
-                        len(datasets[phase])//config.batch_size, examples_per_second.average(),
-                        accuracies.average(), losses.average()))
+                if step % config.print_frequency == 0:
+                    print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
+                              "LR = {:.3f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+                            datetime.now().strftime("%A %H:%M"), epoch+1, step,
+                            train_steps_per_epoch, examples_per_second.average(),
+                            current_learning_rate(optimizer), accuracies.average(), loss))
+
+                if step % config.log_frequency == 0:
+                    writer.add_scalar('train/loss', loss, global_step)
+                    writer.add_scalar('train/accuracy', accuracy, global_step)
+                    writer.add_scalar('train/examples_per_second', step_time, global_step)
+                    writer.add_scalar('train/learning_rate', current_learning_rate(optimizer), global_step)
+                    writer.add_scalar('train/weight_decay', current_weight_decay(optimizer), global_step)
 
             else:
+
                 print("[{}] Epoch {}. Validation Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
                           "Accuracy = {:.3f}, Loss = {:.3f}".format(
                         datetime.now().strftime("%A %H:%M"), epoch+1, step,
@@ -170,8 +188,12 @@ for epoch in range(config.num_epochs):
         if phase == 'train':
             scheduler.step(epoch)
 
-        save_checkpoint_path = os.path.join(config.save_path, 'save_{:03}.pth'.format(epoch))
-        print('Checkpoint written to: {}'.format(save_checkpoint_path))
-        save_checkpoint(save_checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
+        if epoch % config.checkpoint_frequency == 0:
+            save_checkpoint_path = os.path.join(config.checkpoint_dir, 'save_{:03}.pth'.format(epoch))
+            print('Checkpoint written to: {}'.format(save_checkpoint_path))
+            save_checkpoint(save_checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
+
+writer.export_scalars_to_json(os.path.join(config.save_dir, 'all_scalars.json'))
+writer.close()
 
 print('Finished training.')

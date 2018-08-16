@@ -5,10 +5,14 @@ def parse_opts():
 
     parser = argparse.ArgumentParser()
 
-    # Dataset
-    parser.add_argument('--dataset', type=str, required=True, help='Dataset string (kinetics | activitynet | ucf101 | blender)')
+    # Paths
     parser.add_argument('--video_path', type=str, required=True, help='Path to location of dataset videos')
     parser.add_argument('--annotation_path', type=str, required=False, help='Path to location of dataset annotation file')
+    parser.add_argument('--resume_path', default='', type=str, help='Checkpoint file (.pth) of previous training')
+    parser.add_argument('--save_dir', default='./output/', type=str, help='Where to save training outputs.')
+
+    # Dataset
+    parser.add_argument('--dataset', type=str, required=True, help='Dataset string (kinetics | activitynet | ucf101 | blender)')
     parser.add_argument('--num_val_samples', type=int, default=3, help='Number of validation samples for each activity')
     parser.add_argument('--norm_value', default=255, type=int, help='Divide inputs by 255 or 1')
     parser.add_argument('--num_classes', default=400, type=int, help= 'Number of classes (activitynet: 200, kinetics: 400, ucf101: 101, hmdb51: 51)')
@@ -32,7 +36,6 @@ def parse_opts():
     parser.add_argument('--manual_seed', default=1, type=int, help='Manually set random seed')
 
     # Finetuning
-    parser.add_argument('--resume_path', default='', type=str, help='Checkpoint file (.pth) of previous training')
     parser.add_argument('--num_finetune_classes', default=36, type=int, help='Number of classes for fine-tuning. num_classes is set to the number when pretraining.')
     parser.add_argument('--finetune_prefixes', default='logits,Mixed_5', type=str, help='Prefixes of layers to finetune, comma seperated (only used by I3D).')
     parser.add_argument('--finetune_begin_index', default=0, type=int, help='Begin block index of fine-tuning (not used by I3D).')
@@ -47,11 +50,15 @@ def parse_opts():
     parser.add_argument('--batch_size', default=16, type=int, help='Batch Size')
     parser.add_argument('--num_epochs', default=200, type=int, help='Number of epochs to train for')
 
+    # Logging
+    parser.add_argument('--print_frequency', type=int, default=1, help='Print frequency in number of train steps')
+    parser.add_argument('--checkpoint_frequency', type=int, default=1, help='Save checkpoint after this number of epochs')
+    parser.add_argument('--log_frequency', type=int, default=5, help='Logging frequency in number of steps')
+
     # Misc
     parser.add_argument('--device', default='cuda:0', help='Device string cpu | cuda:0')
     parser.add_argument('--history_steps', default=25, type=int, help='History of running average meters')
     parser.add_argument('--num_workers', default=4, type=int, help='Number of threads for multi-thread loading')
     parser.add_argument('--no_eval', action='store_true', default=False, help='Disable evaluation')
-    parser.add_argument('--save_path', default='./checkpoints/', type=str, help='Where to save checkpoint files.')
 
     return parser.parse_args()

@@ -4,12 +4,7 @@ from __future__ import print_function
 
 import torch
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, ToTensor
-
-from transforms.temporal_transforms import LoopPadding, TemporalRandomCrop
-from transforms.target_transforms import ClassLabel, VideoID
-from transforms.target_transforms import Compose as TargetCompose
-
+from transforms.spatial_transforms import Normalize
 from torch.utils.data import DataLoader
 
 from datasets.kinetics import Kinetics
@@ -175,7 +170,6 @@ def get_test_set(config, spatial_transform, temporal_transform, target_transform
 ##########################################################################################
 ##########################################################################################
 
-
 def get_normalization_method(config):
     if config.no_mean_norm and not config.std_norm:
         return Normalize([0, 0, 0], [1, 1, 1])
@@ -189,7 +183,7 @@ def get_normalization_method(config):
 
 def get_data_loaders(config, spatial_transform, temporal_transform, target_transform):
 
-    datasets = dict()
+    datasets     = dict()
     data_loaders = dict()
 
     # Define the data pipeline
@@ -198,10 +192,14 @@ def get_data_loaders(config, spatial_transform, temporal_transform, target_trans
         datasets['train'], config.batch_size, shuffle=True,
         num_workers=config.num_workers, pin_memory=True)
 
+    print('Found {} training examples'.format(len(datasets['train'])))
+
     # Validation loader does not always exist
     datasets['validation'] = get_validation_set(config, spatial_transform, temporal_transform, target_transform)
     if datasets['validation'] is not None:
         print('Found {} validation examples'.format(len(datasets['validation'])))
-        data_loaders['validation'] = DataLoader(datasets['validation'], config.batch_size, shuffle=False, num_workers=config.num_workers, pin_memory=True)
+        data_loaders['validation'] = DataLoader(
+            datasets['validation'], config.batch_size, shuffle=False,
+            num_workers=config.num_workers, pin_memory=True)
 
     return data_loaders, datasets
