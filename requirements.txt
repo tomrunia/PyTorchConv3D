@@ -1,0 +1,6 @@
+six
+numpy
+scipy
+torch >= 0.4.0
+tensorboardX
+matplotlib
