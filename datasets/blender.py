@@ -61,8 +61,8 @@ class BlenderSyntheticDataset(Dataset):
         self._target_offset = min(self._classes)
 
         print('  Number of HDF5 files found: {}'.format(len(self._data_files)))
-        print('  Number of examples found:   {}'.format(self._num_examples))
-        print('  Number of targets found:    {}'.format(len(self._unique_targets)))
+        print('  Number of examples found:   {}'.format(len(self)))
+        print('  Number of targets found:    {}'.format(len(self.classes)))
 
     def __len__(self):
         return self._num_examples
@@ -83,7 +83,7 @@ class BlenderSyntheticDataset(Dataset):
 
         clip   = torch.stack(clip, dim=1).type(torch.FloatTensor)
         target = torch.from_numpy(np.asarray(target-self.target_offset, np.int64))
-        target = torch.unsqueeze(target, -1)
+        #target = torch.unsqueeze(target, -1)
 
         return clip, target
 

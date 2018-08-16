@@ -23,7 +23,8 @@ from datetime import datetime
 
 import torch.nn as nn
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, \
+    RandomVerticalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 
@@ -69,28 +70,25 @@ model = model.to(device)
 # Setup of data transformations
 
 train_transforms = {
-    'spatial':  Compose([MultiScaleRandomCrop(config.scales, config.spatial_size),
-                        RandomHorizontalFlip(), ToTensor(config.norm_value),
-                        Normalize([0, 0, 0], [1, 1, 1])]),
-    'temporal': TemporalRandomCrop(config.sample_duration),
-    'target':   ClassLabel()
+    'spatial':  Compose([#MultiScaleRandomCrop(config.scales, config.spatial_size),
+                        RandomHorizontalFlip(), RandomVerticalFlip(),
+                        ToTensor(config.norm_value), Normalize([0, 0, 0], [1, 1, 1])]),
+    'temporal': None, #TemporalRandomCrop(config.sample_duration),
+    'target':   None, #ClassLabel()
 }
 
 validation_transforms = {
     'spatial':  Compose([CenterCrop(config.spatial_size), ToTensor(config.norm_value),
                          Normalize([0, 0, 0], [1, 1, 1])]),
-    'temporal': TemporalRandomCrop(config.sample_duration),
-    'target':   ClassLabel()
+    'temporal': None, #TemporalRandomCrop(config.sample_duration),
+    'target':   None, #ClassLabel()
 }
 
 ####################################################################
 ####################################################################
 # Setup of data pipeline
 
-# Obtain 'train' and 'validation' loaders
-print('[{}] Preparing datasets...'.format(datetime.now().strftime("%A %H:%M")))
-
-data_loaders, datasets = data_factory.get_data_loaders(config, train_transforms, validation_transforms)
+data_loaders = data_factory.get_data_loaders(config, train_transforms, validation_transforms)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
 ####################################################################

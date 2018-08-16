@@ -51,6 +51,9 @@ def train_epoch(config, model, criterion, optimizer, scheduler, device,
         # Feed-forward through the network
         logits = model.forward(clips)
 
+        if epoch == 0 and step == 0:  # Sanity check
+            assert logits.shape[1] == config.num_classes
+
         _, preds = torch.max(logits, 1)
         loss = criterion(logits, targets)
 
@@ -76,7 +79,7 @@ def train_epoch(config, model, criterion, optimizer, scheduler, device,
             print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Examples/Sec = {:.2f}, "
                   "LR = {:.3f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
                     datetime.now().strftime("%A %H:%M"), epoch+1,
-                    step+1, steps_in_epoch, examples_per_second,
+                    step, steps_in_epoch, examples_per_second,
                     current_learning_rate(optimizer), accuracies[step], losses[step]))
 
         if summary_writer and step % config.log_frequency == 0:
@@ -148,7 +151,7 @@ def validation_epoch(config, model, criterion, device, data_loader, epoch, summa
             print("[{}] Epoch {}. Validation Step {:04d}/{:04d}, Examples/Sec = {:.2f}, "
                   "Accuracy = {:.3f}, Loss = {:.3f}".format(
                     datetime.now().strftime("%A %H:%M"), epoch+1,
-                    step+1, steps_in_epoch, examples_per_second,
+                    step, steps_in_epoch, examples_per_second,
                     accuracies[step], losses[step]))
 
     # Epoch statistics

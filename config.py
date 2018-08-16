@@ -52,7 +52,7 @@ def parse_opts():
     parser.add_argument('--num_epochs', default=200, type=int, help='Number of epochs to train for')
 
     # Logging
-    parser.add_argument('--print_frequency', type=int, default=1, help='Print frequency in number of train steps')
+    parser.add_argument('--print_frequency', type=int, default=5, help='Print frequency in number of train steps')
     parser.add_argument('--checkpoint_frequency', type=int, default=1, help='Save checkpoint after this number of epochs')
     parser.add_argument('--checkpoints_num_keep', type=int, default=5, help='Number of checkpoints to keep')
     parser.add_argument('--log_frequency', type=int, default=5, help='Logging frequency in number of steps')
