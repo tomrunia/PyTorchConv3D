@@ -23,19 +23,20 @@ from datetime import datetime
 
 import torch.nn as nn
 
-from transforms.spatial_transforms import Compose, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 
+from epoch_iterators import train_epoch, validation_epoch
 from utils.utils import *
-from factory.data_factory import *
-from factory.model_factory import generate_model
+import factory.data_factory as data_factory
+import factory.model_factory as model_factory
 from config import parse_opts
 
-from tensorboardX import SummaryWriter
 
 ####################################################################
 ####################################################################
+# Configuration and logging
 
 config = parse_opts()
 config = prepare_output_dirs(config)
@@ -44,21 +45,27 @@ print_config(config)
 write_config(config, os.path.join(config.save_dir, 'config.json'))
 
 # TensorboardX summary writer
-writer = SummaryWriter(log_dir=config.log_dir)
+if not config.no_tensorboard:
+    from tensorboardX import SummaryWriter
+    writer = SummaryWriter(log_dir=config.log_dir)
+else:
+    writer = None
 
 ####################################################################
 ####################################################################
+# Initialize model
 
 device = torch.device(config.device)
 
-print('[{}] Initializing {} model (num_classes={})...'.format(datetime.now().strftime("%A %H:%M"), config.model, config.num_classes))
-
 # Returns the network instance (I3D, 3D-ResNet etc.)
-model, params_to_train = generate_model(config)  # TODO: check what goes wrong here
+model = model_factory.get_model(config)
+
+# Move the model to GPU memory
 model = model.to(device)
 
 ####################################################################
 ####################################################################
+# Setup of data transformations
 
 # Determine cropping scales
 config.scales = [config.initial_scale]
@@ -77,25 +84,23 @@ target_transform   = ClassLabel()
 
 ####################################################################
 ####################################################################
+# Setup of data pipeline
 
 # Obtain 'train' and 'validation' loaders
 print('[{}] Preparing datasets...'.format(datetime.now().strftime("%A %H:%M")))
-data_loaders, datasets = get_data_loaders(config, spatial_transform, temporal_transform, target_transform)
+data_loaders, datasets = data_factory.get_data_loaders(
+    config, spatial_transform, temporal_transform, target_transform)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
 ####################################################################
 ####################################################################
+# Optimizer and loss initialization
 
-examples_per_second = AverageMeter(config.history_steps)
-losses = AverageMeter(config.history_steps)
-accuracies = AverageMeter(config.history_steps)
-
-####################################################################
-####################################################################
-
-# TODO: why does params_to_train instead of model.parameters() not work?
 criterion = nn.CrossEntropyLoss()
 optimizer = get_optimizer(config, model.parameters())
+
+# Restore optimizer params and set config.start_index
+restore_optimizer_state(config, optimizer)
 
 # Learning rate scheduler
 milestones = [int(x) for x in config.lr_scheduler_milestones.split(',')]
@@ -103,96 +108,79 @@ scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones, config.l
 
 ####################################################################
 ####################################################################
-# Good example: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
+# Resume training from previous checkpoint
 
-train_steps_per_epoch = int(np.ceil(len(datasets['train'])/config.batch_size))
+if config.resume_path:
+    model_factory.model_restore_checkpoint(config, model, optimizer)
 
-for epoch in range(config.num_epochs):
+####################################################################
+####################################################################
+
+# Keep track of best validation accuracy
+best_val_acc = 0.0
+
+for epoch in range(config.start_epoch, config.num_epochs+1):
 
     # First 'training' phase, then 'validation' phase
     for phase in phases:
 
-        print('#'*60)
-        print('Starting {} epoch {}'.format(epoch+1, phase))
-
         if phase == 'train':
-            model.train()
-        else:
-            model.eval()
-            val_losses = []
-            val_accuracies = []
 
-        for step, (clips, targets) in enumerate(data_loaders[phase]):
+            # Perform one training epoch
+            train_loss, train_acc, train_duration = train_epoch(
+                config=config,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                device=device,
+                data_loader=data_loaders['train'],
+                epoch=epoch,
+                summary_writer=writer
+            )
 
-            start_time = time.time()
+        elif phase == 'validation':
 
-            # Prepare for next iteration
-            optimizer.zero_grad()
+            # Perform one training epoch
+            val_loss, val_acc, val_duration = validation_epoch(
+                config=config,
+                model=model,
+                criterion=criterion,
+                device=device,
+                data_loader=data_loaders['validation'],
+                epoch=epoch,
+                summary_writer=writer
+            )
 
-            # Move inputs to GPU memory
-            clips   = clips.to(device)
-            targets = targets.to(device)
+    print('#'*60)
+    print('EPOCH {} SUMMARY'.format(epoch+1))
+    print('Training Phase.')
+    print('  Total Duration:              {}'.format(duration_to_string(train_duration)))
+    print('  Average Train Loss:          {:.3f}'.format(train_loss))
+    print('  Average Train Accuracy:      {:.3f}'.format(train_acc))
 
-            # Feed-forward through the network
-            logits = model.forward(clips)
+    if 'validation' in phases:
+        print('Validation Phase.')
+        print('  Total Duration:              {}'.format(duration_to_string(val_duration)))
+        print('  Average Validation Loss:     {:.3f}'.format(val_loss))
+        print('  Average Validation Accuracy: {:.3f}'.format(val_acc))
 
-            # Only for ResNet etc. [n_batch,400] => [n_batch,400,1]
-            #if logits.dim() == 2:
-            #   logits = logits.unsqueeze(-1)
+    if 'validation' in phases and val_acc > best_val_acc:
+        checkpoint_path = os.path.join(config.checkpoint_dir, 'save_best.pth')
+        save_checkpoint(checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
+        print('Found new best validation accuracy: {:.3f}'.format(val_acc))
+        print('Model checkpoint (best) written to:     {}'.format(checkpoint_path))
+        best_val_acc = val_acc
 
-            _, preds = torch.max(logits, 1)
-            loss = criterion(logits, targets)
+    # Model saving
+    if epoch % config.checkpoint_frequency == 0:
+        checkpoint_path = os.path.join(config.checkpoint_dir, 'save_{:03d}.pth'.format(epoch+1))
+        save_checkpoint(checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
+        print('Model checkpoint (periodic) written to: {}'.format(checkpoint_path))
+        cleanup_checkpoint_dir(config)  # remove old checkpoint files
 
-            # Calculate accuracy
-            correct = torch.sum(preds == targets.data)
-            accuracy = correct.double() / config.batch_size
 
-            # Calculate elapsed time for this step
-            step_time = config.batch_size/float(time.time() - start_time)
-
-            if phase == 'train':
-                loss.backward()
-                optimizer.step()
-
-            if phase == 'train':
-
-                global_step = (epoch*train_steps_per_epoch) + step
-
-                # Update average statistics
-                examples_per_second.push(step_time)
-                losses.push(loss.item())
-                accuracies.push(accuracy.item())
-
-                if step % config.print_frequency == 0:
-                    print("[{}] Epoch {}. Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                              "LR = {:.3f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
-                            datetime.now().strftime("%A %H:%M"), epoch+1, step,
-                            train_steps_per_epoch, examples_per_second.average(),
-                            current_learning_rate(optimizer), accuracies.average(), loss))
-
-                if step % config.log_frequency == 0:
-                    writer.add_scalar('train/loss', loss, global_step)
-                    writer.add_scalar('train/accuracy', accuracy, global_step)
-                    writer.add_scalar('train/examples_per_second', step_time, global_step)
-                    writer.add_scalar('train/learning_rate', current_learning_rate(optimizer), global_step)
-                    writer.add_scalar('train/weight_decay', current_weight_decay(optimizer), global_step)
-
-            else:
-
-                print("[{}] Epoch {}. Validation Batch {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                          "Accuracy = {:.3f}, Loss = {:.3f}".format(
-                        datetime.now().strftime("%A %H:%M"), epoch+1, step,
-                        len(datasets[phase])//config.batch_size,
-                        step_time, accuracy.item(), loss.item()))
-
-        if phase == 'train':
-            scheduler.step(epoch)
-
-        if epoch % config.checkpoint_frequency == 0:
-            save_checkpoint_path = os.path.join(config.checkpoint_dir, 'save_{:03}.pth'.format(epoch))
-            print('Checkpoint written to: {}'.format(save_checkpoint_path))
-            save_checkpoint(save_checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
-
+# Dump all TensorBoard logs to disk for external processing
 writer.export_scalars_to_json(os.path.join(config.save_dir, 'all_scalars.json'))
 writer.close()
 

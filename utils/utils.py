@@ -1,8 +1,8 @@
 import os
+import glob
 import shutil
 import time
 
-import csv
 import simplejson
 
 import numpy as np
@@ -10,57 +10,6 @@ import numpy as np
 import torch
 import torch.optim
 import torchvision
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self, history=10):
-        self.history = history
-        self.values = np.zeros(self.history, dtype=np.float32)
-        self.num_recorded = 0
-
-    def push(self, value):
-        assert np.isscalar(value)
-        if self.num_recorded == 0:
-            self.values.fill(value)
-        else:
-            self.values[:-1] = self.values[1:]
-            self.values[-1] = value
-        self.num_recorded += 1
-
-    def last(self):
-        return self.values[-1]
-
-    def average(self):
-        num_avg = min(self.history, self.num_recorded)
-        return np.mean(self.values[-num_avg:])
-
-    def reset(self):
-        self.values = np.zeros(self.history, dtype=np.float32)
-        self.num_recorded = 0
-
-
-class Logger(object):
-
-    def __init__(self, path, header):
-        self.log_file = open(path, 'w')
-        self.logger = csv.writer(self.log_file, delimiter='\t')
-
-        self.logger.writerow(header)
-        self.header = header
-
-    def __del(self):
-        self.log_file.close()
-
-    def log(self, values):
-        write_values = []
-        for col in self.header:
-            assert col in values
-            write_values.append(values[col])
-
-        self.logger.writerow(write_values)
-        self.log_file.flush()
 
 ####################################################################
 ####################################################################
@@ -97,6 +46,17 @@ def prepare_output_dirs(config):
     os.mkdir(config.log_dir)
     return config
 
+def cleanup_checkpoint_dir(config):
+    checkpoint_files = glob.glob(os.path.join(config.checkpoint_dir, 'save_*.pth'))
+    checkpoint_files.sort()
+    if len(checkpoint_files) > config.checkpoints_num_keep:
+        shutil.rmtree(checkpoint_files[0])
+
+def duration_to_string(seconds):
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+
 ####################################################################
 ####################################################################
 
@@ -108,6 +68,12 @@ def get_optimizer(config, params):
     elif config.optimizer == 'adam':
         return torch.optim.Adam(params, config.learning_rate, weight_decay=config.weight_decay)
     raise ValueError('Chosen optimizer is not supported, please choose from (SGD | adam | rmsprop)')
+
+def restore_optimizer_state(config, optimizer):
+    if not config.resume_path: return
+    checkpoint = torch.load(config.resume_path)
+    config.start_epoch = checkpoint['epoch']
+    optimizer.load_state_dict(checkpoint['optimizer'])
 
 def current_learning_rate(optimizer):
     return optimizer.state_dict()['param_groups'][0]['lr']

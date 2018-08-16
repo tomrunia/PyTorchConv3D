@@ -48,12 +48,15 @@ def parse_opts():
     parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
     parser.add_argument('--weight_decay', default=1e-5, type=float, help='Weight Decay')
     parser.add_argument('--batch_size', default=16, type=int, help='Batch Size')
+    parser.add_argument('--start_epoch', default=0, type=int, help='Starting epoch, only relevant for finetuning')
     parser.add_argument('--num_epochs', default=200, type=int, help='Number of epochs to train for')
 
     # Logging
     parser.add_argument('--print_frequency', type=int, default=1, help='Print frequency in number of train steps')
     parser.add_argument('--checkpoint_frequency', type=int, default=1, help='Save checkpoint after this number of epochs')
+    parser.add_argument('--checkpoints_num_keep', type=int, default=5, help='Number of checkpoints to keep')
     parser.add_argument('--log_frequency', type=int, default=5, help='Logging frequency in number of steps')
+    parser.add_argument('--no_tensorboard', action='store_true', default=False, help='Disable the use of TensorboardX')
 
     # Misc
     parser.add_argument('--device', default='cuda:0', help='Device string cpu | cuda:0')
