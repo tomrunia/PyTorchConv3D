@@ -30,6 +30,13 @@ def output_subdir(config):
     subdir = "{}_{}_{}_lr{:.3f}".format(prefix, config.dataset, config.model, config.learning_rate)
     return os.path.join(config.save_dir, subdir)
 
+def init_cropping_scales(config):
+    # Determine cropping scales
+    config.scales = [config.initial_scale]
+    for i in range(1, config.num_scales):
+        config.scales.append(config.scales[-1] * config.scale_step)
+    return config
+
 def prepare_output_dirs(config):
     # Set output directories
     config.save_dir = output_subdir(config)

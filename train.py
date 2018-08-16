@@ -23,7 +23,7 @@ from datetime import datetime
 
 import torch.nn as nn
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 
@@ -40,6 +40,7 @@ from config import parse_opts
 
 config = parse_opts()
 config = prepare_output_dirs(config)
+config = init_cropping_scales(config)
 
 print_config(config)
 write_config(config, os.path.join(config.save_dir, 'config.json'))
@@ -67,20 +68,20 @@ model = model.to(device)
 ####################################################################
 # Setup of data transformations
 
-# Determine cropping scales
-config.scales = [config.initial_scale]
-for i in range(1, config.num_scales):
-    config.scales.append(config.scales[-1] * config.scale_step)
+train_transforms = {
+    'spatial':  Compose([MultiScaleRandomCrop(config.scales, config.spatial_size),
+                        RandomHorizontalFlip(), ToTensor(config.norm_value),
+                        Normalize([0, 0, 0], [1, 1, 1])]),
+    'temporal': TemporalRandomCrop(config.sample_duration),
+    'target':   ClassLabel()
+}
 
-spatial_transform = Compose([
-    MultiScaleRandomCrop(config.scales, config.spatial_size),
-    RandomHorizontalFlip(),
-    ToTensor(config.norm_value),
-    Normalize([0, 0, 0], [1, 1, 1])
-])
-
-temporal_transform = TemporalRandomCrop(config.sample_duration)
-target_transform   = ClassLabel()
+validation_transforms = {
+    'spatial':  Compose([CenterCrop(config.spatial_size), ToTensor(config.norm_value),
+                         Normalize([0, 0, 0], [1, 1, 1])]),
+    'temporal': TemporalRandomCrop(config.sample_duration),
+    'target':   ClassLabel()
+}
 
 ####################################################################
 ####################################################################
@@ -88,8 +89,8 @@ target_transform   = ClassLabel()
 
 # Obtain 'train' and 'validation' loaders
 print('[{}] Preparing datasets...'.format(datetime.now().strftime("%A %H:%M")))
-data_loaders, datasets = data_factory.get_data_loaders(
-    config, spatial_transform, temporal_transform, target_transform)
+
+data_loaders, datasets = data_factory.get_data_loaders(config, train_transforms, validation_transforms)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
 ####################################################################
