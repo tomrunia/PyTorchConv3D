@@ -31,7 +31,7 @@ def train_epoch(config, model, criterion, optimizer, scheduler, device,
     model.train()
 
     # Epoch statistics
-    steps_in_epoch = 50 #int(np.ceil(len(data_loader.dataset)/config.batch_size))
+    steps_in_epoch = int(np.ceil(len(data_loader.dataset)/config.batch_size))
     losses = np.zeros(steps_in_epoch, np.float32)
     accuracies = np.zeros(steps_in_epoch, np.float32)
 
@@ -86,10 +86,6 @@ def train_epoch(config, model, criterion, optimizer, scheduler, device,
             summary_writer.add_scalar('train/learning_rate', current_learning_rate(optimizer), global_step)
             summary_writer.add_scalar('train/weight_decay', current_weight_decay(optimizer), global_step)
 
-        # fixme 2x
-        if step == steps_in_epoch-1:
-            break
-
     # Learning rate scheduler
     scheduler.step(epoch)
 
@@ -117,7 +113,7 @@ def validation_epoch(config, model, criterion, device, data_loader, epoch, summa
     model.eval()
 
     # Epoch statistics
-    steps_in_epoch = 20 #int(np.ceil(len(data_loader.dataset)/config.batch_size))
+    steps_in_epoch = int(np.ceil(len(data_loader.dataset)/config.batch_size))
     losses = np.zeros(steps_in_epoch, np.float32)
     accuracies = np.zeros(steps_in_epoch, np.float32)
 
@@ -154,10 +150,6 @@ def validation_epoch(config, model, criterion, device, data_loader, epoch, summa
                     datetime.now().strftime("%A %H:%M"), epoch+1,
                     step+1, steps_in_epoch, examples_per_second,
                     accuracies[step], losses[step]))
-
-        # fixme 2x
-        if step == steps_in_epoch-1:
-            break
 
     # Epoch statistics
     epoch_duration = float(time.time() - epoch_start_time)
