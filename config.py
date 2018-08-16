@@ -45,6 +45,7 @@ def parse_opts():
     parser.add_argument('--learning_rate', default=0.1, type=float, help='Initial learning rate (divided by 10 while training by lr-scheduler)')
     parser.add_argument('--lr_scheduler_milestones', default='25,50', type=str, help='Learning rate scheduling, when to multiply learning rate by gamma')
     parser.add_argument('--lr_scheduler_gamma', default=0.1, type=float, help='Learning rate decay factor')
+    parser.add_argument('--early_stopping_patience', default=10, type=int, help='Early stopping patience (number of epochs)')
     parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
     parser.add_argument('--weight_decay', default=1e-5, type=float, help='Weight Decay')
     parser.add_argument('--batch_size', default=16, type=int, help='Batch Size')

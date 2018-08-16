@@ -115,6 +115,7 @@ if config.resume_path:
 ####################################################################
 
 # Keep track of best validation accuracy
+val_acc_history = []
 best_val_acc = 0.0
 
 for epoch in range(config.start_epoch, config.num_epochs+1):
@@ -150,16 +151,18 @@ for epoch in range(config.start_epoch, config.num_epochs+1):
                 summary_writer=writer
             )
 
+            val_acc_history.append(val_acc)
+
     print('#'*60)
     print('EPOCH {} SUMMARY'.format(epoch+1))
     print('Training Phase.')
-    print('  Total Duration:              {}'.format(duration_to_string(train_duration)))
+    print('  Total Duration:              {} minutes'.format(int(np.ceil(train_duration / 60))))
     print('  Average Train Loss:          {:.3f}'.format(train_loss))
     print('  Average Train Accuracy:      {:.3f}'.format(train_acc))
 
     if 'validation' in phases:
         print('Validation Phase.')
-        print('  Total Duration:              {}'.format(duration_to_string(val_duration)))
+        print('  Total Duration:              {} minutes'.format(int(np.ceil(val_duration / 60))))
         print('  Average Validation Loss:     {:.3f}'.format(val_loss))
         print('  Average Validation Accuracy: {:.3f}'.format(val_acc))
 
@@ -176,6 +179,15 @@ for epoch in range(config.start_epoch, config.num_epochs+1):
         save_checkpoint(checkpoint_path, epoch, model.state_dict(), optimizer.state_dict())
         print('Model checkpoint (periodic) written to: {}'.format(checkpoint_path))
         cleanup_checkpoint_dir(config)  # remove old checkpoint files
+
+    # Early stopping
+    if epoch+1 > config.early_stopping_patience:
+        last_val_acc = val_acc_history[-config.early_stopping_patience:]
+        if all(acc < best_val_acc for acc in last_val_acc):
+            # All last validation accuracies are smaller than the best
+            print('Early stopping because validation accuracy has not '
+                  'improved the last {} epochs.'.format(config.early_stopping_patience))
+            break
 
 
 # Dump all TensorBoard logs to disk for external processing

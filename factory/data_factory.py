@@ -55,6 +55,7 @@ def get_training_set(config, spatial_transform, temporal_transform, target_trans
 
         training_data = BlenderSyntheticDataset(
             root_path=config.video_path,
+            subset='train',
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
             target_transform=target_transform)
@@ -111,7 +112,13 @@ def get_validation_set(config, spatial_transform, temporal_transform, target_tra
             sample_duration=config.sample_duration)
 
     elif config.dataset == 'blender':
-        raise NotImplementedError('blender validation set not implemented')
+
+        validation_data = BlenderSyntheticDataset(
+            root_path=config.video_path,
+            subset='validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            target_transform=target_transform)
 
     return validation_data
 

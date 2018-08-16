@@ -28,14 +28,15 @@ from torch.utils.data import Dataset
 
 class BlenderSyntheticDataset(Dataset):
 
-    def __init__(self, root_path, spatial_transform=None,
+    def __init__(self, root_path, subset, spatial_transform=None,
                  temporal_transform=None, target_transform=None):
 
-        # work in progress
         assert temporal_transform is None, 'Temporal transform not supported for BlenderDataset'
         assert target_transform is None,   'Target transform not supported for BlenderDataset'
+        assert subset in ('train', 'validation')
 
         self._root_path = root_path
+        self._subset = subset
 
         self._spatial_transform = spatial_transform
         self._temporal_transform = temporal_transform
@@ -46,7 +47,7 @@ class BlenderSyntheticDataset(Dataset):
 
     def _make_dataset(self):
 
-        self._data_files = glob.glob(os.path.join(self._root_path, '*.h5'))
+        self._data_files = glob.glob(os.path.join(self._root_path, self._subset, 'data', '*.h5'))
         self._data_files.sort()
 
         with h5py.File(self._data_files[0]) as hf:
@@ -60,9 +61,9 @@ class BlenderSyntheticDataset(Dataset):
 
         self._target_offset = min(self._classes)
 
-        print('  Number of HDF5 files found: {}'.format(len(self._data_files)))
-        print('  Number of examples found:   {}'.format(len(self)))
-        print('  Number of targets found:    {}'.format(len(self.classes)))
+        print('  Number of {} HDF5 files found: {}'.format(self._subset, len(self._data_files)))
+        print('  Number of {} examples found:   {}'.format(self._subset, len(self)))
+        print('  Number of {} targets found:    {}'.format(self._subset, len(self.classes)))
 
     def __len__(self):
         return self._num_examples
@@ -83,13 +84,15 @@ class BlenderSyntheticDataset(Dataset):
 
         clip   = torch.stack(clip, dim=1).type(torch.FloatTensor)
         target = torch.from_numpy(np.asarray(target-self.target_offset, np.int64))
-        #target = torch.unsqueeze(target, -1)
-
         return clip, target
 
     @property
     def classes(self):
         return self._classes
+
+    @property
+    def subset(self):
+        return self._subset
 
     @property
     def num_classes(self):
