@@ -50,7 +50,7 @@ def cleanup_checkpoint_dir(config):
     checkpoint_files = glob.glob(os.path.join(config.checkpoint_dir, 'save_*.pth'))
     checkpoint_files.sort()
     if len(checkpoint_files) > config.checkpoints_num_keep:
-        shutil.rmtree(checkpoint_files[0])
+        os.remove(checkpoint_files[0])
 
 def duration_to_string(seconds):
     hours, remainder = divmod(seconds, 3600)

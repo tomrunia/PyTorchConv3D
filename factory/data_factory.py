@@ -199,7 +199,7 @@ def get_data_loaders(config, spatial_transform, temporal_transform, target_trans
     if datasets['validation'] is not None:
         print('Found {} validation examples'.format(len(datasets['validation'])))
         data_loaders['validation'] = DataLoader(
-            datasets['validation'], config.batch_size, shuffle=False,
+            datasets['validation'], config.batch_size, shuffle=True,
             num_workers=config.num_workers, pin_memory=True)
 
     return data_loaders, datasets

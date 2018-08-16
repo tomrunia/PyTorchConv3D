@@ -13,7 +13,7 @@ def parse_opts():
 
     # Dataset
     parser.add_argument('--dataset', type=str, required=True, help='Dataset string (kinetics | activitynet | ucf101 | blender)')
-    parser.add_argument('--num_val_samples', type=int, default=3, help='Number of validation samples for each activity')
+    parser.add_argument('--num_val_samples', type=int, default=1, help='Number of validation samples for each activity')
     parser.add_argument('--norm_value', default=255, type=int, help='Divide inputs by 255 or 1')
     parser.add_argument('--num_classes', default=400, type=int, help= 'Number of classes (activitynet: 200, kinetics: 400, ucf101: 101, hmdb51: 51)')
 
