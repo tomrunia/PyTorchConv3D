@@ -5,7 +5,7 @@ This repository contains PyTorch models of I3D and 3D-ResNets based on the follo
 - https://github.com/piergiaj/pytorch-i3d/blob/master/pytorch_i3d.py
 - https://github.com/kenshohara/3D-ResNets-PyTorch/
 
-**Models:** I3D, 3D-ResNet, 3D-DenseNet, 3D-ResNeXt
+**Models:** I3D, 3D-ResNet, 3D-DenseNet, 3D-ResNeXt  
 **Datasets:** UCF-101, Kinetics, ActivityNet, Charades
 
 ## Installation
