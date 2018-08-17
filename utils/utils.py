@@ -55,6 +55,13 @@ def init_cropping_scales(config):
         config.scales.append(config.scales[-1] * config.scale_step)
     return config
 
+def set_lr_scheduling_policy(config):
+    if config.lr_plateau_patience > 0 and not config.no_eval:
+        config.lr_scheduler = 'plateau'
+    else:
+        config.lr_scheduler = 'multi_step'
+    return config
+
 def prepare_output_dirs(config):
     # Set output directories
     config.save_dir = output_subdir(config)

@@ -22,7 +22,7 @@ from utils.utils import *
 import torch
 
 
-def train_epoch(config, model, criterion, optimizer, scheduler, device,
+def train_epoch(config, model, criterion, optimizer, device,
                 data_loader, epoch, summary_writer=None):
 
     print('#'*80)
@@ -88,9 +88,6 @@ def train_epoch(config, model, criterion, optimizer, scheduler, device,
             summary_writer.add_scalar('train/examples_per_second', examples_per_second, global_step)
             summary_writer.add_scalar('train/learning_rate', current_learning_rate(optimizer), global_step)
             summary_writer.add_scalar('train/weight_decay', current_weight_decay(optimizer), global_step)
-
-    # Learning rate scheduler
-    scheduler.step(epoch)
 
     # Epoch statistics
     epoch_duration = float(time.time() - epoch_start_time)

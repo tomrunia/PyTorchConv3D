@@ -41,6 +41,7 @@ from config import parse_opts
 config = parse_opts()
 config = prepare_output_dirs(config)
 config = init_cropping_scales(config)
+config = set_lr_scheduling_policy(config)
 
 print_config(config)
 write_config(config, os.path.join(config.save_dir, 'config.json'))
@@ -101,8 +102,12 @@ optimizer = get_optimizer(config, model.parameters())
 restore_optimizer_state(config, optimizer)
 
 # Learning rate scheduler
-milestones = [int(x) for x in config.lr_scheduler_milestones.split(',')]
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones, config.lr_scheduler_gamma)
+if config.lr_scheduler == 'plateau':
+    assert 'validation' in phases
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', config.lr_scheduler_gamma, config.lr_plateau_patience)
+else:
+    milestones = [int(x) for x in config.lr_scheduler_milestones.split(',')]
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones, config.lr_scheduler_gamma)
 
 ####################################################################
 ####################################################################
@@ -131,7 +136,6 @@ for epoch in range(config.start_epoch, config.num_epochs+1):
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
-                scheduler=scheduler,
                 device=device,
                 data_loader=data_loaders['train'],
                 epoch=epoch,
@@ -152,6 +156,13 @@ for epoch in range(config.start_epoch, config.num_epochs+1):
             )
 
             val_acc_history.append(val_acc)
+
+    # Update learning rate
+    if config.lr_scheduler == 'plateau':
+        scheduler.step(val_loss)
+    else:
+        scheduler.step(epoch)
+
 
     print('#'*60)
     print('EPOCH {} SUMMARY'.format(epoch+1))
@@ -181,7 +192,7 @@ for epoch in range(config.start_epoch, config.num_epochs+1):
         cleanup_checkpoint_dir(config)  # remove old checkpoint files
 
     # Early stopping
-    if epoch+1 > config.early_stopping_patience:
+    if epoch > config.early_stopping_patience:
         last_val_acc = val_acc_history[-config.early_stopping_patience:]
         if all(acc < best_val_acc for acc in last_val_acc):
             # All last validation accuracies are smaller than the best
