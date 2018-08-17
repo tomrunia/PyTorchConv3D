@@ -43,7 +43,7 @@ def parse_opts():
     # Optimization
     parser.add_argument('--optimizer', default='adam', type=str, help='Which optimizer to use (SGD | adam | rmsprop)')
     parser.add_argument('--learning_rate', default=0.1, type=float, help='Initial learning rate (divided by 10 while training by lr-scheduler)')
-    parser.add_argument('--lr_plateau_patience', default='10', type=str, help='Decay learning rate on plateauing of the validation loss (set -1 to disable)')
+    parser.add_argument('--lr_plateau_patience', default='10', type=int, help='Decay learning rate on plateauing of the validation loss (set -1 to disable)')
     parser.add_argument('--lr_scheduler_milestones', default='25,50', type=str, help='Learning rate scheduling, when to multiply learning rate by gamma')
     parser.add_argument('--lr_scheduler_gamma', default=0.1, type=float, help='Learning rate decay factor')
     parser.add_argument('--early_stopping_patience', default=20, type=int, help='Early stopping patience (number of epochs)')
