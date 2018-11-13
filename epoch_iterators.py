@@ -47,6 +47,7 @@ def train_epoch(config, model, criterion, optimizer, device,
         # Move inputs to GPU memory
         clips   = clips.to(device)
         targets = targets.to(device)
+        targets = torch.unsqueeze(targets, -1)
 
         # Feed-forward through the network
         logits = model.forward(clips)
