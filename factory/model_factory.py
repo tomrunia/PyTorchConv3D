@@ -179,10 +179,13 @@ def model_restore_checkpoint(config, model, optimizer=None):
         raise FileNotFoundError('Model checkpoint file does not exist: {}'.format(config.resume_path))
 
     if config.model == 'i3d':
-        raise ValueError('i3d model restoring currently not supported...')
+        checkpoint = torch.load(config.resume_path)
+        model_params = checkpoint
+    else:
+        checkpoint = torch.load(config.resume_path)
+        model_params = checkpoint['state_dict']
 
-    checkpoint = torch.load(config.resume_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(model_params)
     print('Restored model checkpoint from: {}'.format(config.resume_path))
 
 
