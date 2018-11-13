@@ -70,18 +70,18 @@ model = model.to(device)
 # Setup of data transformations
 
 train_transforms = {
-    'spatial':  Compose([#MultiScaleRandomCrop(config.scales, config.spatial_size),
-                        RandomHorizontalFlip(), RandomVerticalFlip(),
-                        ToTensor(config.norm_value), Normalize([0, 0, 0], [1, 1, 1])]),
-    'temporal': None, #TemporalRandomCrop(config.sample_duration),
-    'target':   None, #ClassLabel()
+    'spatial':  Compose([MultiScaleRandomCrop(config.scales, config.spatial_size),
+                         RandomHorizontalFlip(), RandomVerticalFlip(),
+                         ToTensor(config.norm_value), Normalize([0, 0, 0], [1, 1, 1])]),
+    'temporal': TemporalRandomCrop(config.sample_duration),
+    'target':   ClassLabel()
 }
 
 validation_transforms = {
     'spatial':  Compose([CenterCrop(config.spatial_size), ToTensor(config.norm_value),
                          Normalize([0, 0, 0], [1, 1, 1])]),
-    'temporal': None, #TemporalRandomCrop(config.sample_duration),
-    'target':   None, #ClassLabel()
+    'temporal': TemporalRandomCrop(config.sample_duration),
+    'target':   ClassLabel()
 }
 
 ####################################################################
