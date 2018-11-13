@@ -335,32 +335,48 @@ class InceptionI3D(nn.Module):
             x = x.squeeze(3).squeeze(3)
         return x  # logits
 
-    def replace_logits(self, num_classes):
-        self._num_classes = num_classes
-        self.layers['logits'] = Unit3D(
-            in_channels=384+384+128+128, output_channels=num_classes,
-            kernel_size=[1, 1, 1], padding=0, activation_fn=None,
-            use_batch_norm=False, use_bias=True, name=self._model_name+'logits')
-        self.logits = self.layers['logits']
-
-        # Weight initialization for new logits layer
-        self._init_weights(self.logits.modules())
-
-    def freeze_weights(self):
-        for param in self.parameters():
-            param.requires_grad = False
-
-    def set_finetune_layers(self, prefixes):
-        assert isinstance(prefixes, list)
-        for param_name, param in self.named_parameters():
-            for prefix in prefixes:
-                if prefix in param_name:
-                    param.requires_grad = True
-                    break
-
     def trainable_params(self):
         params = []
         for param in self.parameters():
             if param.requires_grad:
                 params.append(param)
         return params
+
+    def replace_logits(self, num_classes, device='cuda:0'):
+        print('Replacing I3D logits to {} output classes.'.format(num_classes))
+        self._num_classes = num_classes
+        self.layers['logits'] = Unit3D(
+            in_channels=384+384+128+128, output_channels=num_classes,
+            kernel_size=[1, 1, 1], padding=0, activation_fn=None,
+            use_batch_norm=False, use_bias=True, name=self._model_name+'logits')
+
+        self.logits = self.layers['logits']
+
+        # Weight initialization for new logits layer
+        self._init_weights(self.logits.modules())
+
+        # Move to GPU
+        if 'cuda' in device: self.logits.cuda()
+
+##########################################################################################
+##########################################################################################
+
+def get_fine_tuning_parameters(model, ft_prefixes):
+
+    assert isinstance(ft_prefixes, str)
+
+    if ft_prefixes == '':
+        return model.parameters()
+
+    print('#'*60)
+    print('Setting finetuning layer prefixes: {}'.format(ft_prefixes))
+
+    ft_prefixes = ft_prefixes.split(',')
+    parameters = []
+    for param_name, param in model.named_parameters():
+        for prefix in ft_prefixes:
+            if param_name.startswith(prefix):
+                print('  Finetuning parameter: {}'.format(param_name))
+                parameters.append({'params': param, 'name': param_name})
+
+    return parameters

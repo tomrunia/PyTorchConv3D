@@ -53,8 +53,14 @@ def train_epoch(config, model, criterion, optimizer, device,
         # Feed-forward through the network
         logits = model.forward(clips)
 
-        if epoch == 0 and step == 0:  # Sanity check
-            assert logits.shape[1] == config.num_classes
+        if epoch == 0 and step == 0:
+            # Sanity check
+            if config.checkpoint_path:
+                if logits.shape[1] != config.finetune_num_classes:
+                    raise RuntimeError('Number of output logits ({}) does not match number of finetune classes ({})'.format(logits.shape[1], config.finetune_num_classes))
+            else:
+                if logits.shape[1] != config.num_classes:
+                    raise RuntimeError('Number of output logits ({}) does not match number of classes ({})'.format(logits.shape[1], config.finetune_num_classes))
 
         _, preds = torch.max(logits, 1)
         loss = criterion(logits, targets)
