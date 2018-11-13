@@ -170,7 +170,7 @@ def get_model(config):
 ######################################################################################
 ######################################################################################
 
-def model_restore_checkpoint(config, model, optimizer=None):
+def model_restore_checkpoint(config, model):
 
     if not config.resume_path:
         raise ValueError('Attempting to restore checkpoint but config.resume_path is not set.')
@@ -189,15 +189,15 @@ def model_restore_checkpoint(config, model, optimizer=None):
     print('Restored model checkpoint from: {}'.format(config.resume_path))
 
 
-def model_replace_output_layer(model, model_name, num_finetune_classes):
+def model_replace_output_layer(model, model_name, finetune_num_classes):
 
     if model_name == 'i3d':
         raise ValueError('i3d model restoring currently not supported...')
 
     if model_name == 'densenet':
-        model.classifier = nn.Linear(model.classifier.in_features, num_finetune_classes)
+        model.classifier = nn.Linear(model.classifier.in_features, finetune_num_classes)
     else:
-        model.fc = nn.Linear(model.fc.in_features, num_finetune_classes)
+        model.fc = nn.Linear(model.fc.in_features, finetune_num_classes)
 
 
 def model_finetuning_params(model, model_name, finetune_begin_index):
