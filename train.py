@@ -117,13 +117,6 @@ else:
 
 ####################################################################
 ####################################################################
-# Resume training from previous checkpoint
-
-# if config.checkpoint_file:
-#     model_factory.model_restore_checkpoint(config, model)
-
-####################################################################
-####################################################################
 
 # Keep track of best validation accuracy
 val_acc_history = []
