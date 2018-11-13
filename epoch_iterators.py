@@ -85,7 +85,7 @@ def train_epoch(config, model, criterion, optimizer, device,
 
         if step % config.print_frequency == 0:
             print("[{}] Epoch {}. Train Step {:04d}/{:04d}, Examples/Sec = {:.2f}, "
-                  "LR = {:.3f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
+                  "LR = {:.4f}, Accuracy = {:.3f}, Loss = {:.3f}".format(
                     datetime.now().strftime("%A %H:%M"), epoch+1,
                     step, steps_in_epoch, examples_per_second,
                     current_learning_rate(optimizer), accuracies[step], losses[step]))

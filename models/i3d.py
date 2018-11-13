@@ -373,10 +373,17 @@ def get_fine_tuning_parameters(model, ft_prefixes):
 
     ft_prefixes = ft_prefixes.split(',')
     parameters = []
+    param_names = []
     for param_name, param in model.named_parameters():
         for prefix in ft_prefixes:
             if param_name.startswith(prefix):
                 print('  Finetuning parameter: {}'.format(param_name))
                 parameters.append({'params': param, 'name': param_name})
+                param_names.append(param_name)
+
+    for param_name, param in model.named_parameters():
+        if param_name not in param_names:
+            # This sames a lot of GPU memory...
+            param.requires_grad = False
 
     return parameters
