@@ -180,6 +180,7 @@ def get_fine_tuning_parameters(model, ft_begin_index):
 
     assert isinstance(ft_begin_index, int)
     if ft_begin_index == 0:
+        print('WARNING: training full network because --finetune_begin_index=0')
         return model.parameters()
 
     ft_module_names = []

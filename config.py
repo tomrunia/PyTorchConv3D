@@ -38,7 +38,8 @@ def parse_opts():
     parser.add_argument('--checkpoint_path', default='', type=str, help='Checkpoint file (.pth) of previous training')
     parser.add_argument('--finetune_num_classes', default=36, type=int, help='Number of classes for fine-tuning. num_classes is set to the number when pretraining.')
     parser.add_argument('--finetune_prefixes', default='logits,Mixed_5', type=str, help='Prefixes of layers to finetune, comma seperated (only used by I3D).')
-    parser.add_argument('--finetune_begin_index', default=0, type=int, help='Begin block index of fine-tuning (not used by I3D).')
+    parser.add_argument('--finetune_begin_index', default=4, type=int, help='Begin block index of fine-tuning (not used by I3D).')
+    parser.add_argument('--finetune_restore_optimizer', action='store_true', help='Whether to restore optimizer state')
 
     # Optimization
     parser.add_argument('--optimizer', default='adam', type=str, help='Which optimizer to use (SGD | adam | rmsprop)')

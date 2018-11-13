@@ -177,7 +177,9 @@ def get_model(config):
         print('Moving model to CUDA device...')
         # Move model to the GPU
         model = model.cuda()
-        #model = nn.DataParallel(model, device_ids=None)
+
+        if config.model != 'i3d':
+            model = nn.DataParallel(model, device_ids=None)
 
         if config.checkpoint_path:
 
@@ -194,6 +196,8 @@ def get_model(config):
 
             # Setup finetuning layer for different number of classes
             # Note: the DataParallel adds 'module' dict to complicate things...
+            print('Replacing model logits with {} output classes.'.format(config.finetune_num_classes))
+
             if config.model == 'i3d':
                 model.replace_logits(config.finetune_num_classes)
             elif config.model == 'densenet':
@@ -204,29 +208,12 @@ def get_model(config):
                 model.module.fc = model.module.fc.cuda()
 
             # Setup which layers to train
-            finetune_criterion = config.finetune_prefixes if config.model == 'i3d' else config.finetune_begin_index
+            assert config.model in ('i3d', 'resnet'), 'finetune params not implemented...'
+            finetune_criterion = config.finetune_prefixes if config.model in ('i3d', 'resnet') else config.finetune_begin_index
             parameters_to_train = get_fine_tuning_parameters(model, finetune_criterion)
 
             return model, parameters_to_train
     else:
-
-        if config.checkpoint_path:
-
-            print('Loading pretrained model {}'.format(config.checkpoint_path))
-            assert os.path.isfile(config.checkpoint_path)
-
-            checkpoint = torch.load(config.checkpoint_path)
-            model.load_state_dict(checkpoint['state_dict'])
-
-            if config.model == 'densenet':
-                model.classifier = nn.Linear(model.classifier.in_features, config.finetune_num_classes)
-            else:
-                model.fc = nn.Linear(model.fc.in_features, config.finetune_num_classes)
-
-            # Setup which layers to train
-            finetune_criterion = config.finetune_prefixes if config.model == 'i3d' else config.finetune_begin_index
-            parameters_to_train = get_fine_tuning_parameters(model, finetune_criterion)
-
-            return model, parameters_to_train
+        raise ValueError('CPU training not supported.')
 
     return model, model.parameters()

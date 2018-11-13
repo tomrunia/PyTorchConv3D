@@ -343,7 +343,6 @@ class InceptionI3D(nn.Module):
         return params
 
     def replace_logits(self, num_classes, device='cuda:0'):
-        print('Replacing I3D logits to {} output classes.'.format(num_classes))
         self._num_classes = num_classes
         self.layers['logits'] = Unit3D(
             in_channels=384+384+128+128, output_channels=num_classes,

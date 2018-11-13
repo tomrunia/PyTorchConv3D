@@ -197,6 +197,7 @@ def get_fine_tuning_parameters(model, ft_begin_index):
 
     assert isinstance(ft_begin_index, int)
     if ft_begin_index == 0:
+        print('WARNING: training full network because --finetune_begin_index=0')
         return model.parameters()
 
     ft_module_names = []
@@ -207,12 +208,20 @@ def get_fine_tuning_parameters(model, ft_begin_index):
     ft_module_names.append('classifier')
 
     parameters = []
+    param_names_to_finetune = []
+
     for k, v in model.named_parameters():
         for ft_module in ft_module_names:
             if ft_module in k:
                 parameters.append({'params': v})
+                param_names_to_finetune.append(k)
                 break
         else:
+            param_names_to_finetune.append(k)
             parameters.append({'params': v, 'lr': 0.0})
+
+    for k, v in model.named_parameters():
+        if k not in param_names_to_finetune:
+            v.requires_grad = False
 
     return parameters

@@ -21,6 +21,7 @@ import time
 from datetime import datetime
 
 import torch.nn as nn
+import torch.backends.cudnn as cudnn
 
 from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, \
     RandomVerticalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
@@ -32,7 +33,6 @@ from utils.utils import *
 import factory.data_factory as data_factory
 import factory.model_factory as model_factory
 from config import parse_opts
-
 
 ####################################################################
 ####################################################################
@@ -58,17 +58,18 @@ else:
 # Initialize model
 
 device = torch.device(config.device)
+#torch.backends.cudnn.enabled = False
 
 # Returns the network instance (I3D, 3D-ResNet etc.)
 # Note: this also restores the weights and optionally replaces final layer
 model, parameters = model_factory.get_model(config)
 
-param_names = [p['name'] for p in parameters]
-
 print('#'*60)
-print('Parameters to train:')
-print(param_names)
-print('#'*60)
+if config.model == 'i3d':
+    param_names = [p['name'] for p in parameters]
+    print('Parameters to train:')
+    print(param_names)
+    print('#'*60)
 
 ####################################################################
 ####################################################################
@@ -105,7 +106,8 @@ criterion = nn.CrossEntropyLoss()
 optimizer = get_optimizer(config, parameters)
 
 # Restore optimizer params and set config.start_index
-restore_optimizer_state(config, optimizer)
+if config.finetune_restore_optimizer:
+    restore_optimizer_state(config, optimizer)
 
 # Learning rate scheduler
 if config.lr_scheduler == 'plateau':
