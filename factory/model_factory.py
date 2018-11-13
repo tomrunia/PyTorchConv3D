@@ -29,22 +29,24 @@ from models.i3d import InceptionI3D
 def get_model(config):
 
     assert config.model in ['i3d', 'resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet']
-
     print('Initializing {} model (num_classes={})...'.format(config.model, config.num_classes))
 
     if config.model == 'i3d':
 
-         model = InceptionI3D(
-             num_classes=config.num_classes,
-             spatial_squeeze=True,
-             final_endpoint='logits',
-             in_channels=3,
-             dropout_keep_prob=config.dropout_keep_prob
-         )
+        from models.i3d import get_fine_tuning_parameters
+
+        model = InceptionI3D(
+            num_classes=config.num_classes,
+            spatial_squeeze=True,
+            final_endpoint='logits',
+            in_channels=3,
+            dropout_keep_prob=config.dropout_keep_prob
+        )
 
     elif config.model == 'resnet':
 
         assert config.model_depth in [10, 18, 34, 50, 101, 152, 200]
+        from models.resnet import get_fine_tuning_parameters
 
         if config.model_depth == 10:
 
@@ -105,6 +107,7 @@ def get_model(config):
     elif config.model == 'wideresnet':
 
         assert config.model_depth in [50]
+        from models.wide_resnet import get_fine_tuning_parameters
 
         if config.model_depth == 50:
             model = wide_resnet.resnet50(
@@ -117,6 +120,7 @@ def get_model(config):
     elif config.model == 'resnext':
 
         assert config.model_depth in [50, 101, 152]
+        from models.resnext import get_fine_tuning_parameters
 
         if config.model_depth == 50:
             model = resnext.resnet50(
@@ -143,6 +147,7 @@ def get_model(config):
     elif config.model == 'densenet':
 
         assert config.model_depth in [121, 169, 201, 264]
+        from models.densenet import get_fine_tuning_parameters
 
         if config.model_depth == 121:
             model = densenet.densenet121(
@@ -165,94 +170,63 @@ def get_model(config):
                 spatial_size=config.spatial_size,
                 sample_duration=config.sample_duration)
 
-    return model
-
-######################################################################################
-######################################################################################
-
-def model_restore_checkpoint(config, model):
-
-    if not config.resume_path:
-        raise ValueError('Attempting to restore checkpoint but config.resume_path is not set.')
-
-    if not os.path.exists(config.resume_path):
-        raise FileNotFoundError('Model checkpoint file does not exist: {}'.format(config.resume_path))
-
-    if config.model == 'i3d':
-        checkpoint = torch.load(config.resume_path)
-        model_params = checkpoint
-    else:
-        checkpoint = torch.load(config.resume_path)
-        model_params = checkpoint['state_dict']
-
-    model.load_state_dict(model_params)
-    print('Restored model checkpoint from: {}'.format(config.resume_path))
 
 
-def model_replace_output_layer(model, model_name, finetune_num_classes):
+    if 'cuda' in config.device:
 
-    if model_name == 'i3d':
-        raise ValueError('i3d model restoring currently not supported...')
+        print('Moving model to CUDA device...')
+        # Move model to the GPU
+        model = model.cuda()
+        #model = nn.DataParallel(model, device_ids=None)
 
-    if model_name == 'densenet':
-        model.classifier = nn.Linear(model.classifier.in_features, finetune_num_classes)
-    else:
-        model.fc = nn.Linear(model.fc.in_features, finetune_num_classes)
+        if config.checkpoint_path:
 
+            print('Loading pretrained model {}'.format(config.checkpoint_path))
+            assert os.path.isfile(config.checkpoint_path)
 
-def model_finetuning_params(model, model_name, finetune_begin_index):
+            checkpoint = torch.load(config.checkpoint_path)
+            if config.model == 'i3d':
+                pretrained_weights = checkpoint
+            else:
+                pretrained_weights = checkpoint['state_dict']
 
-    if model_name == 'resnet':
+            model.load_state_dict(pretrained_weights)
 
-        from models.resnet import get_fine_tuning_parameters
-        return get_fine_tuning_parameters(model, finetune_begin_index)
+            # Setup finetuning layer for different number of classes
+            # Note: the DataParallel adds 'module' dict to complicate things...
+            if config.model == 'i3d':
+                model.replace_logits(config.finetune_num_classes)
+            elif config.model == 'densenet':
+                model.module.classifier = nn.Linear(model.module.classifier.in_features, config.finetune_num_classes)
+                model.module.classifier = model.module.classifier.cuda()
+            else:
+                model.module.fc = nn.Linear(model.module.fc.in_features, config.finetune_num_classes)
+                model.module.fc = model.module.fc.cuda()
 
-    elif model_name == 'densenet':
+            # Setup which layers to train
+            finetune_criterion = config.finetune_prefixes if config.model == 'i3d' else config.finetune_begin_index
+            parameters_to_train = get_fine_tuning_parameters(model, finetune_criterion)
 
-        from models.densenet import get_fine_tuning_parameters
-        return get_fine_tuning_parameters(model, finetune_begin_index)
-
-    elif model_name == 'resnext':
-
-        from models.resnext import get_fine_tuning_parameters
-        return get_fine_tuning_parameters(model, finetune_begin_index)
-
-    elif model_name == 'wideresnet':
-
-        from models.wide_resnet import get_fine_tuning_parameters
-        return get_fine_tuning_parameters(model, finetune_begin_index)
-
+            return model, parameters_to_train
     else:
 
-        raise ValueError('i3d model restoring currently not supported...')
+        if config.checkpoint_path:
 
+            print('Loading pretrained model {}'.format(config.checkpoint_path))
+            assert os.path.isfile(config.checkpoint_path)
 
-    # if config.model == 'i3d':
-    #     # model restoring for I3D
-    #
-    #     model_dict = model.state_dict()
-    #     checkpoint_state_dict = torch.load(config.resume_path)
-    #     checkpoint_state_dict = {k: v for k, v in checkpoint_state_dict.items() if k in model_dict}
-    #     model.load_state_dict(checkpoint_state_dict)
-    #
-    #     # Print the layer names of restored variables
-    #     layer_names = set([k.split('.')[0] for k in checkpoint_state_dict.keys()])
-    #     print('Restored weights: {}'.format(layer_names))
-    #
-    #     # Disabling finetuning for all layers
-    #     model.freeze_weights()
-    #
-    #     # Replace last layer with different number of logits when finetuning
-    #     if config.num_classes != config.num_finetune_classes:
-    #         model.replace_logits(config.num_finetune_classes)
-    #
-    #     # Enable gradient for layers to finetune
-    #     finetune_prefixes = config.finetune_prefixes.split(',')
-    #     model.set_finetune_layers(finetune_prefixes)
-    #
-    #     # Obtain parameters to be fed into the optimizer
-    #     params_to_train = model.trainable_params()
-    #     return model, params_to_train
+            checkpoint = torch.load(config.checkpoint_path)
+            model.load_state_dict(checkpoint['state_dict'])
 
-    # Return model and all parameters to optimize (no finetuning)
-    #return model, model.parameters()
+            if config.model == 'densenet':
+                model.classifier = nn.Linear(model.classifier.in_features, config.finetune_num_classes)
+            else:
+                model.fc = nn.Linear(model.fc.in_features, config.finetune_num_classes)
+
+            # Setup which layers to train
+            finetune_criterion = config.finetune_prefixes if config.model == 'i3d' else config.finetune_begin_index
+            parameters_to_train = get_fine_tuning_parameters(model, finetune_criterion)
+
+            return model, parameters_to_train
+
+    return model, model.parameters()

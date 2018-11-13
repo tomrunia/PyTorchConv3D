@@ -194,6 +194,8 @@ def densenet264(**kwargs):
 ##########################################################################################
 
 def get_fine_tuning_parameters(model, ft_begin_index):
+
+    assert isinstance(ft_begin_index, int)
     if ft_begin_index == 0:
         return model.parameters()
 

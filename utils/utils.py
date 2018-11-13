@@ -102,9 +102,8 @@ def get_optimizer(config, params):
     raise ValueError('Chosen optimizer is not supported, please choose from (SGD | adam | rmsprop)')
 
 def restore_optimizer_state(config, optimizer):
-    if not config.resume_path: return
-    checkpoint = torch.load(config.resume_path)
-
+    if not config.checkpoint_path: return
+    checkpoint = torch.load(config.checkpoint_path)
     if 'optimizer' in checkpoint.keys():
         # I3D model has no optimizer state
         config.start_epoch = checkpoint['epoch']

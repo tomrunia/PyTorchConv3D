@@ -60,10 +60,15 @@ else:
 device = torch.device(config.device)
 
 # Returns the network instance (I3D, 3D-ResNet etc.)
-model = model_factory.get_model(config)
+# Note: this also restores the weights and optionally replaces final layer
+model, parameters = model_factory.get_model(config)
 
-# Move the model to GPU memory
-model = model.to(device)
+param_names = [p['name'] for p in parameters]
+
+print('#'*60)
+print('Parameters to train:')
+print(param_names)
+print('#'*60)
 
 ####################################################################
 ####################################################################
@@ -90,7 +95,6 @@ validation_transforms = {
 
 data_loaders = data_factory.get_data_loaders(config, train_transforms, validation_transforms)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
-
 print('#'*60)
 
 ####################################################################
@@ -98,7 +102,7 @@ print('#'*60)
 # Optimizer and loss initialization
 
 criterion = nn.CrossEntropyLoss()
-optimizer = get_optimizer(config, model.parameters())
+optimizer = get_optimizer(config, parameters)
 
 # Restore optimizer params and set config.start_index
 restore_optimizer_state(config, optimizer)
@@ -115,8 +119,8 @@ else:
 ####################################################################
 # Resume training from previous checkpoint
 
-if config.resume_path:
-    model_factory.model_restore_checkpoint(config, model, optimizer)
+# if config.checkpoint_file:
+#     model_factory.model_restore_checkpoint(config, model)
 
 ####################################################################
 ####################################################################
