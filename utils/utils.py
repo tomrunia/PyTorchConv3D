@@ -104,8 +104,13 @@ def get_optimizer(config, params):
 def restore_optimizer_state(config, optimizer):
     if not config.resume_path: return
     checkpoint = torch.load(config.resume_path)
-    config.start_epoch = checkpoint['epoch']
-    optimizer.load_state_dict(checkpoint['optimizer'])
+
+    if 'optimizer' in checkpoint.keys():
+        # I3D model has no optimizer state
+        config.start_epoch = checkpoint['epoch']
+        optimizer.load_state_dict(checkpoint['optimizer'])
+    else:
+        print('WARNING: not restoring optimizer state as it is not found in the checkpoint file.')
 
 def current_learning_rate(optimizer):
     return optimizer.state_dict()['param_groups'][0]['lr']

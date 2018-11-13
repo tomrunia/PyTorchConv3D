@@ -25,7 +25,7 @@ import torch
 def train_epoch(config, model, criterion, optimizer, device,
                 data_loader, epoch, summary_writer=None):
 
-    print('#'*80)
+    print('#'*60)
     print('Epoch {}. Starting with training phase.'.format(epoch+1))
 
     model.train()
@@ -47,7 +47,8 @@ def train_epoch(config, model, criterion, optimizer, device,
         # Move inputs to GPU memory
         clips   = clips.to(device)
         targets = targets.to(device)
-        targets = torch.unsqueeze(targets, -1)
+        if config.model == 'i3d':
+            targets = torch.unsqueeze(targets, -1)
 
         # Feed-forward through the network
         logits = model.forward(clips)
@@ -108,7 +109,7 @@ def train_epoch(config, model, criterion, optimizer, device,
 
 def validation_epoch(config, model, criterion, device, data_loader, epoch, summary_writer=None):
 
-    print('#'*80)
+    print('#'*60)
     print('Epoch {}. Starting with validation phase.'.format(epoch+1))
 
     model.eval()

@@ -91,6 +91,8 @@ validation_transforms = {
 data_loaders = data_factory.get_data_loaders(config, train_transforms, validation_transforms)
 phases = ['train', 'validation'] if 'validation' in data_loaders else ['train']
 
+print('#'*60)
+
 ####################################################################
 ####################################################################
 # Optimizer and loss initialization

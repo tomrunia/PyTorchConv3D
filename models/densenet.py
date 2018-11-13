@@ -7,65 +7,6 @@ import math
 __all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet264', 'get_fine_tuning_parameters']
 
 
-def densenet121(**kwargs):
-    model = DenseNet(
-        num_init_features=64,
-        growth_rate=32,
-        block_config=(6, 12, 24, 16),
-        **kwargs)
-    return model
-
-
-def densenet169(**kwargs):
-    model = DenseNet(
-        num_init_features=64,
-        growth_rate=32,
-        block_config=(6, 12, 32, 32),
-        **kwargs)
-    return model
-
-
-def densenet201(**kwargs):
-    model = DenseNet(
-        num_init_features=64,
-        growth_rate=32,
-        block_config=(6, 12, 48, 32),
-        **kwargs)
-    return model
-
-
-def densenet264(**kwargs):
-    model = DenseNet(
-        num_init_features=64,
-        growth_rate=32,
-        block_config=(6, 12, 64, 48),
-        **kwargs)
-    return model
-
-
-def get_fine_tuning_parameters(model, ft_begin_index):
-    if ft_begin_index == 0:
-        return model.parameters()
-
-    ft_module_names = []
-    for i in range(ft_begin_index, 5):
-        ft_module_names.append('denseblock{}'.format(i))
-        ft_module_names.append('transition{}'.format(i))
-    ft_module_names.append('norm5')
-    ft_module_names.append('classifier')
-
-    parameters = []
-    for k, v in model.named_parameters():
-        for ft_module in ft_module_names:
-            if ft_module in k:
-                parameters.append({'params': v})
-                break
-        else:
-            parameters.append({'params': v, 'lr': 0.0})
-
-    return parameters
-
-
 class _DenseLayer(nn.Sequential):
 
     def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
@@ -210,3 +151,66 @@ class DenseNet(nn.Module):
                 features.size(0), -1)
         out = self.classifier(out)
         return out
+
+##########################################################################################
+##########################################################################################
+
+def densenet121(**kwargs):
+    model = DenseNet(
+        num_init_features=64,
+        growth_rate=32,
+        block_config=(6, 12, 24, 16),
+        **kwargs)
+    return model
+
+
+def densenet169(**kwargs):
+    model = DenseNet(
+        num_init_features=64,
+        growth_rate=32,
+        block_config=(6, 12, 32, 32),
+        **kwargs)
+    return model
+
+
+def densenet201(**kwargs):
+    model = DenseNet(
+        num_init_features=64,
+        growth_rate=32,
+        block_config=(6, 12, 48, 32),
+        **kwargs)
+    return model
+
+
+def densenet264(**kwargs):
+    model = DenseNet(
+        num_init_features=64,
+        growth_rate=32,
+        block_config=(6, 12, 64, 48),
+        **kwargs)
+    return model
+
+##########################################################################################
+##########################################################################################
+
+def get_fine_tuning_parameters(model, ft_begin_index):
+    if ft_begin_index == 0:
+        return model.parameters()
+
+    ft_module_names = []
+    for i in range(ft_begin_index, 5):
+        ft_module_names.append('denseblock{}'.format(i))
+        ft_module_names.append('transition{}'.format(i))
+    ft_module_names.append('norm5')
+    ft_module_names.append('classifier')
+
+    parameters = []
+    for k, v in model.named_parameters():
+        for ft_module in ft_module_names:
+            if ft_module in k:
+                parameters.append({'params': v})
+                break
+        else:
+            parameters.append({'params': v, 'lr': 0.0})
+
+    return parameters
