@@ -11,13 +11,14 @@ import copy
 
 from utils.utils import load_value_file
 
+##########################################################################################
+##########################################################################################
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
         with Image.open(f) as img:
             return img.convert('RGB')
-
 
 def accimage_loader(path):
     try:
@@ -27,14 +28,12 @@ def accimage_loader(path):
         # Potentially a decoding problem, fall back to PIL.Image
         return pil_loader(path)
 
-
 def get_default_image_loader():
     from torchvision import get_image_backend
     if get_image_backend() == 'accimage':
         return accimage_loader
     else:
         return pil_loader
-
 
 def video_loader(video_dir_path, frame_indices, image_loader):
     video = []
@@ -47,16 +46,13 @@ def video_loader(video_dir_path, frame_indices, image_loader):
 
     return video
 
-
 def get_default_video_loader():
     image_loader = get_default_image_loader()
     return functools.partial(video_loader, image_loader=image_loader)
 
-
 def load_annotation_data(data_file_path):
     with open(data_file_path, 'r') as data_file:
         return json.load(data_file)
-
 
 def get_class_labels(data):
     class_labels_map = {}
@@ -65,7 +61,6 @@ def get_class_labels(data):
         class_labels_map[class_label] = index
         index += 1
     return class_labels_map
-
 
 def get_video_names_and_annotations(data, subset):
     video_names = []
@@ -80,6 +75,8 @@ def get_video_names_and_annotations(data, subset):
 
     return video_names, annotations
 
+##########################################################################################
+##########################################################################################
 
 def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
                  sample_duration):
@@ -143,8 +140,8 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
 
     return dataset, idx_to_class
 
-############################################################################
-############################################################################
+##########################################################################################
+##########################################################################################
 
 class UCF101(data.Dataset):
     """

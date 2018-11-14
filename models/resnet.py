@@ -193,27 +193,81 @@ class ResNet(nn.Module):
 ##########################################################################################
 ##########################################################################################
 
-def get_fine_tuning_parameters(model, ft_begin_index):
 
-    assert isinstance(ft_begin_index, int)
-    if ft_begin_index == 0:
+def get_fine_tuning_parameters(model, ft_prefixes):
+
+    assert isinstance(ft_prefixes, str)
+
+    if ft_prefixes == '':
+        print('WARNING: training full network because --ft_predixes=None')
         return model.parameters()
 
-    ft_module_names = []
-    for i in range(ft_begin_index, 5):
-        ft_module_names.append('layer{}'.format(i))
-    ft_module_names.append('fc')
+    print('#'*60)
+    print('Setting finetuning layer prefixes: {}'.format(ft_prefixes))
 
+    ft_prefixes = ft_prefixes.split(',')
     parameters = []
-    for k, v in model.named_parameters():
-        for ft_module in ft_module_names:
-            if ft_module in k:
-                parameters.append({'params': v})
-                break
-        else:
-            parameters.append({'params': v, 'lr': 0.0})
+    param_names = []
+    for param_name, param in model.named_parameters():
+        for prefix in ft_prefixes:
+            if prefix in param_name:
+                print('  Finetuning parameter: {}'.format(param_name))
+                parameters.append({'params': param, 'name': param_name})
+                param_names.append(param_name)
+
+    for param_name, param in model.named_parameters():
+        if param_name not in param_names:
+            # This sames a lot of GPU memory...
+            print('disabling gradient for: {}'.format(param_name))
+            param.requires_grad = False
 
     return parameters
+
+
+
+# def get_fine_tuning_parameters(model, ft_begin_index):
+#
+#     assert isinstance(ft_begin_index, int)
+#     if ft_begin_index == 0:
+#         print('WARNING: training full network because --finetune_begin_index=0')
+#         return model.parameters()
+#
+#     for param_name, param in model.named_modules():
+#         print(param_name)
+#
+#
+#     ft_module_names = []
+#     for i in range(ft_begin_index, 5):
+#         ft_module_names.append('layer{}'.format(i))
+#     ft_module_names.append('fc')
+#
+#     print('Modules to finetune: {}'.format(ft_module_names))
+#
+#     parameters = []
+#     param_names_to_finetune = []
+#     for k, v in model.named_parameters():
+#         for ft_module in ft_module_names:
+#             if ft_module in k:
+#                 parameters.append({'params': v, 'name': k})
+#                 param_names_to_finetune.append(k)
+#                 break
+#         else:
+#             parameters.append({'params': v, 'lr': 0.0, 'name': k})
+#             param_names_to_finetune.append(k)
+#
+#     # Disabling gradients for frozen weights (hacky...)
+#     frozen_module_names = []
+#     for i in range(0, ft_begin_index):
+#         frozen_module_names.append('layer{}'.format(i))
+#     for k, v in model.named_parameters():
+#         for frozen_module in frozen_module_names:
+#             if frozen_module in k:
+#                 print('disabling grad for: {}'.format(k))
+#                 v.requires_grad = False
+#     model.module.conv1.requires_grad = False
+#     model.module.bn1.requires_grad = False
+#
+#     return parameters
 
 ##########################################################################################
 ##########################################################################################
