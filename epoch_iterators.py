@@ -45,7 +45,7 @@ def train_epoch(config, model, criterion, optimizer, device,
         optimizer.zero_grad()
 
         # Move inputs to GPU memory
-        clips   = clips.to(device)
+        clips = clips.to(device)
         targets = targets.to(device)
         if config.model == 'i3d':
             targets = torch.unsqueeze(targets, -1)
@@ -96,6 +96,16 @@ def train_epoch(config, model, criterion, optimizer, device,
             summary_writer.add_scalar('train/examples_per_second', examples_per_second, global_step)
             summary_writer.add_scalar('train/learning_rate', current_learning_rate(optimizer), global_step)
             summary_writer.add_scalar('train/weight_decay', current_weight_decay(optimizer), global_step)
+
+        if summary_writer and step % config.log_image_frequency == 0:
+            # TensorboardX video summary
+            for example_idx in range(4):
+                clip_for_display = clips[example_idx].clone().cpu()
+                min_val = float(clip_for_display.min())
+                max_val = float(clip_for_display.max())
+                clip_for_display.clamp_(min=min_val, max=max_val)
+                clip_for_display.add_(-min_val).div_(max_val - min_val + 1e-5)
+                summary_writer.add_video('train_clips/{:04d}'.format(example_idx), clip_for_display.unsqueeze(0), global_step)
 
     # Epoch statistics
     epoch_duration = float(time.time() - epoch_start_time)
@@ -158,6 +168,16 @@ def validation_epoch(config, model, criterion, device, data_loader, epoch, summa
                     datetime.now().strftime("%A %H:%M"), epoch+1,
                     step, steps_in_epoch, examples_per_second,
                     accuracies[step], losses[step]))
+
+        if summary_writer and step == 0:
+            # TensorboardX video summary
+            for example_idx in range(4):
+                clip_for_display = clips[example_idx].clone().cpu()
+                min_val = float(clip_for_display.min())
+                max_val = float(clip_for_display.max())
+                clip_for_display.clamp_(min=min_val, max=max_val)
+                clip_for_display.add_(-min_val).div_(max_val - min_val + 1e-5)
+                summary_writer.add_video('validation_clips/{:04d}'.format(example_idx), clip_for_display.unsqueeze(0), epoch*steps_in_epoch)
 
     # Epoch statistics
     epoch_duration = float(time.time() - epoch_start_time)

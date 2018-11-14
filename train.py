@@ -21,15 +21,14 @@ import time
 from datetime import datetime
 
 import torch.nn as nn
-import torch.backends.cudnn as cudnn
 
-from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, \
-    RandomVerticalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
+from transforms.spatial_transforms import Compose, Normalize, RandomHorizontalFlip, MultiScaleRandomCrop, ToTensor, CenterCrop
 from transforms.temporal_transforms import TemporalRandomCrop
 from transforms.target_transforms import ClassLabel
 
 from epoch_iterators import train_epoch, validation_epoch
 from utils.utils import *
+import utils.mean_values
 import factory.data_factory as data_factory
 import factory.model_factory as model_factory
 from config import parse_opts
@@ -42,6 +41,9 @@ config = parse_opts()
 config = prepare_output_dirs(config)
 config = init_cropping_scales(config)
 config = set_lr_scheduling_policy(config)
+
+config.image_mean = utils.mean_values.get_mean(config.norm_value, config.dataset)
+config.image_std = utils.mean_values.get_std(config.norm_value)
 
 print_config(config)
 write_config(config, os.path.join(config.save_dir, 'config.json'))
@@ -75,17 +77,39 @@ if config.model == 'i3d':
 ####################################################################
 # Setup of data transformations
 
+if config.no_dataset_mean and config.no_dataset_std:
+    # Just zero-center and scale to unit std
+    print('Data normalization: no dataset mean, no dataset std')
+    norm_method = Normalize([0, 0, 0], [1, 1, 1])
+elif not config.no_dataset_mean and config.no_dataset_std:
+    # Subtract dataset mean and scale to unit std
+    print('Data normalization: use dataset mean, no dataset std')
+    norm_method = Normalize(config.image_mean, [1, 1, 1])
+else:
+    # Subtract dataset mean and scale to dataset std
+    print('Data normalization: use dataset mean, use dataset std')
+    norm_method = Normalize(config.image_mean, config.image_std)
+
 train_transforms = {
     'spatial':  Compose([MultiScaleRandomCrop(config.scales, config.spatial_size),
-                         RandomHorizontalFlip(), RandomVerticalFlip(),
-                         ToTensor(config.norm_value), Normalize([0, 0, 0], [1, 1, 1])]),
+                         RandomHorizontalFlip(),
+                         ToTensor(config.norm_value),
+                         norm_method]),
     'temporal': TemporalRandomCrop(config.sample_duration),
     'target':   ClassLabel()
 }
 
+# print('WARNING: setting train transforms for dataset statistics')
+# train_transforms = {
+#     'spatial':  Compose([ToTensor(1.0)]),
+#     'temporal': TemporalRandomCrop(64),
+#     'target':   ClassLabel()
+# }
+
 validation_transforms = {
-    'spatial':  Compose([CenterCrop(config.spatial_size), ToTensor(config.norm_value),
-                         Normalize([0, 0, 0], [1, 1, 1])]),
+    'spatial':  Compose([CenterCrop(config.spatial_size),
+                         ToTensor(config.norm_value),
+                         norm_method]),
     'temporal': TemporalRandomCrop(config.sample_duration),
     'target':   ClassLabel()
 }

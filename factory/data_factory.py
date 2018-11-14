@@ -209,8 +209,8 @@ def get_data_loaders(config, train_transforms, validation_transforms=None):
     if not config.no_eval and validation_transforms:
 
         dataset_validation = get_validation_set(
-            config, train_transforms['spatial'],
-            train_transforms['temporal'], train_transforms['target'])
+            config, validation_transforms['spatial'],
+            validation_transforms['temporal'], validation_transforms['target'])
 
         print('Found {} validation examples'.format(len(dataset_validation)))
 
